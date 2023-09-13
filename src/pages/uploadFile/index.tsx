@@ -6,6 +6,7 @@ import Editor from './codeEditor';
 import './style.css'
 import { FieldType, IBaseViewMeta, IFieldMeta, IOpenAttachment, IOpenCellValue, IWidgetField, IWidgetTable, IWidgetView, TableMeta, ViewType, bitable } from '@lark-base-open/js-sdk';
 import { fieldIcons } from './icons'
+import TextArea from 'antd/es/input/TextArea';
 
 enum UploadFileActionType {
     /** 自定义pickFile函数.. */
@@ -16,20 +17,21 @@ enum UploadFileActionType {
 
 function getTemp() {
     return [{
-        code: `//${t('code.1')}
-// ${t('code.2')}
-function pickFile({ compareValues, fileList }) {
-    // ${t('code.3')}
-    // ${t('code.4')}
-    // ${t('code.6')}
-    // ${t('code.5')}
+        code: `//${t('code.23')}
+/**
+ * ${t('code.24')}
+ * ${t('code.25')}
+ * ${t('code.26')}
+ */
+function pickFile({ compareValues, fileList, currentValue }) {
+    const reg = window._reg || /[,，。、;；\s]+/g
     let firstCelValue = compareValues[0]
     if (!Array.isArray(firstCelValue)) {
         // ${t('code.7')}
-        return
+        return currentValue
     }
-    // 
-    firstCelValue = firstCelValue.map(({ text }) => text).join('').replace(/[,，。、;；\\s]+/g, ',').split(',')
+
+    firstCelValue = firstCelValue.map(({ text }) => text).join('').replace(reg, ',').split(',')
 
     const files = fileList.filter((file) => {
         // ${t('code.9')}
@@ -38,7 +40,12 @@ function pickFile({ compareValues, fileList }) {
         return firstCelValue.includes(fileName)
 
     })
-    return files
+
+    if (files.length) {
+        return files;
+    }
+
+    return currentValue // ${t('code.21')}
 }`,
         desc: t('upload.by.name.desc'),
         title: t('upload.by.name.title'),
@@ -86,8 +93,8 @@ function ChooseTemp({ onChange }: { onChange: (arg: any) => any }) {
 /** 文件和上传完成的token */
 const fielTokenMap = new Map<File, string>()
 
-/* 记录id和需要上传的文件,null清空，undefined表示使用原来的值 */
-const recordFiles = new Map<string, File[] | null | undefined>()
+/* 记录需要改动的记录,null清空，undefined表示使用原来的值 */
+const recordFiles = new Map<string, (File | IOpenAttachment)[] | null | undefined>()
 
 export default function RefreshCom() {
     const [selectionChange, setSelectionChange] = useState<any>();
@@ -256,17 +263,15 @@ function UploadFileToForm() {
                 const timeStamp = new Date().getTime();
                 const currentUploadingFies: string = files.map(({ name }) => name).join('，');
                 setLoadingContent(t('uploading.now') + currentUploadingFies)
-                for (let index = 0; index < files.length; index += 5) {
-                    const elements: (string | File)[] = files.slice(index, index + 5).map((f) => {
-                        return fielTokenMap.get(f) ?? f
-                    });
+                const allFilesToBeUpload: File[] = files.filter((f) => (f instanceof File) && !fielTokenMap.has(f)) as any
+                for (let index = 0; index < allFilesToBeUpload.length; index += 5) {
+                    const elements: (File)[] = allFilesToBeUpload.slice(index, index + 5)
 
-                    const newFileToBeUpload: File[] = elements.filter((f) => typeof f === 'object') as any;
                     let tokens: string[] = []
-                    if (newFileToBeUpload.length) {
-                        tokens = await bitable.base.batchUploadFile(newFileToBeUpload);
+                    if (elements.length) {
+                        tokens = await bitable.base.batchUploadFile(elements);
                     }
-                    newFileToBeUpload.forEach((f, index) => {
+                    elements.forEach((f, index) => {
                         if (typeof f === 'object') {
                             fielTokenMap.set(f, tokens[index]);
                         }
@@ -274,6 +279,10 @@ function UploadFileToForm() {
                 }
 
                 const cellValue: IOpenAttachment[] = files.map((f) => {
+                    if (!(f instanceof File)) {
+                        return f
+                    }
+
                     return {
                         name: f.name,
                         size: f.size,
@@ -369,18 +378,19 @@ function UploadFileToForm() {
                 }))
 
                 tableInfo.current!.comparesFieldValueList = comparesFieldValueList
-
                 try {
                     setLoadingContent(t('is.matching'))
                     setLoading(true)
 
                     setTimeout(() => {
                         tableInfo.current?.viewRecordIdList.map((recordId) => {
+                            const currentFileFieldValue = tableInfo.current?.exitFileValueList[recordId]
                             // 和所选一样的顺序
                             const compareValues = compares.map((fieldId: string) => comparesFieldValueList[fieldId][recordId])
-                            const files = pickFile({ fileList, compareValues }) || []
+                            const files = pickFile({ fileList, compareValues, currentValue: currentFileFieldValue }) || []
+
                             if (!overWriteFile) {
-                                if (tableInfo.current?.exitFileValueList[recordId]) {
+                                if (currentFileFieldValue) {
                                     recordFiles.set(recordId, undefined)
                                 } else {
                                     recordFiles.set(recordId, files?.length ? files : null)
@@ -507,7 +517,19 @@ function UploadFileToForm() {
                                 children: <Editor defaultValue={codeEditorValue.current}
                                     onChange={(v) => { codeEditorValue.current = v }} />
                             }]} defaultActiveKey={['-1']} />,
-                            <br />]}
+                            <br />,
+                            <Form.Item initialValue={',，。、;；'} tooltip={t('self.reg.tooltip')} label={t('self.reg')}>
+                                <TextArea defaultValue={', ，。、;；'} onChange={(v) => {
+                                    if (!v.target.value) {
+                                        //@ts-ignore
+                                        window['_reg'] = '';
+                                        return;
+                                    }
+                                    //@ts-ignore
+                                    window['_reg'] = new RegExp(`[${v.target.value}]+`,'g')
+                                }}></TextArea>
+                            </Form.Item>
+                            ]}
                         </div>
 
 
@@ -556,7 +578,7 @@ function UploadFileToForm() {
                                         <CloudUploadOutlined rev={undefined} />
                                     </div>
                                     <div>
-                                        {fileList.length ? <span style={{color:'#1890ff'}}>{t('selected.num.file', { num: fileList.length })}</span> : t('please.choose.file')}
+                                        {fileList.length ? <span style={{ color: '#1890ff' }}>{t('selected.num.file', { num: fileList.length })}</span> : t('please.choose.file')}
                                     </div>
                                 </div>
                             </div>
@@ -629,7 +651,7 @@ function getPreviewTable({ fieldsMetaList, fileFieldId, allRecordsIds, compares,
         fieldsMetaList: IFieldMeta[],
         fileFieldId: string,
         compares: string[],
-        recordFiles: Map<string, File[] | null | undefined>
+        recordFiles: Map<string, { name: string }[] | null | undefined>
         allRecordsIds: string[],
         // 所用到的值列表
         comparesFieldValueList: {
@@ -689,3 +711,19 @@ function getTalbeCellString(cell: IOpenCellValue) {
 }
 //@ts-ignore
 window.getTalbeCellString = getTalbeCellString
+
+
+function createRegexFromString(str: string) {
+    const regexParts = str.trim().match(/\/(.*)\/([gimyus]{0,6})/);
+
+    if (regexParts && regexParts.length >= 3) {
+        const pattern = regexParts[1];
+        const flags = regexParts[2];
+
+        const regex = new RegExp(pattern, flags);
+
+        return regex;
+    } else {
+        throw new Error('Invalid regular expression string');
+    }
+}

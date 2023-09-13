@@ -43,6 +43,13 @@
     "code.8": "Get the file name using the interval from the identification field",
     "code.9": "File name (excluding file suffix)",
     "code.10": "Filter the required files according to the identification field",
+    "code.21": "If no file is matched, the original attachment is used",
+    "code.23": "This function will act on all records, and then select the files needed for the record (the priority is lower than the overwrite existing file switch below)",
+    "self.reg": "Custom delimiter",
+    "code.24": "compareValues: The original value array of the selected identification field cell of the current record, in the same order as the selected option",
+    "code.25": "fileList: list of all selected files",
+    "code.26": "currentValue: the value of the selected attachment field in the current record",
+    "self.reg.tooltip": "Treat each character as a separator to separate the file names in the matching field",
     "choose.mode": "choose mode",
     "btn.preview": "File upload preview"
 }

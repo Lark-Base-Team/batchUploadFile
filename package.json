@@ -24,7 +24,7 @@
   "dependencies": {
     "@ant-design/icons": "5.2.5",
     "@codemirror/lang-javascript": "6.2.1",
-    "@lark-base-open/js-sdk": "https://lf3-static.bytednsdoc.com/obj/eden-cn/jjjpceh7nulojvhj/@lark-base-open-js-sdk-0.2.1-alpha.2.tgz",
+    "@lark-base-open/js-sdk": "^0.2.1",
     "@lezer/highlight": "1.1.6",
     "@uiw/codemirror-themes": "4.21.12",
     "@uiw/react-codemirror": "4.21.12",

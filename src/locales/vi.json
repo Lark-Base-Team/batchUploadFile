@@ -43,6 +43,13 @@
     "code.8": "Lấy tên tập tin bằng cách sử dụng khoảng thời gian từ trường nhận dạng",
     "code.9": "Tên tệp (không bao gồm hậu tố tệp)",
     "code.10": "Lọc các tập tin cần thiết theo trường nhận dạng",
-    "choose.mode:": "chọn chế độ",
+    "code.21": "Nếu không có tập tin nào trùng khớp, tập tin đính kèm gốc sẽ được sử dụng",
+    "code.23": "Chức năng này sẽ hoạt động trên tất cả các bản ghi, sau đó chọn các tệp cần thiết cho bản ghi (mức độ ưu tiên thấp hơn nút chuyển ghi đè tệp hiện có bên dưới)",
+    "self.reg": "Dấu phân cách tùy chỉnh",
+    "code.24": "compareValues: Mảng giá trị ban đầu của ô trường nhận dạng đã chọn của bản ghi hiện tại, theo cùng thứ tự với tùy chọn đã chọn",
+    "code.25": "fileList: danh sách tất cả các tập tin đã chọn",
+    "code.26": "currentValue: giá trị của trường đính kèm đã chọn trong bản ghi hiện tại",
+    "self.reg.tooltip": "Coi mỗi ký tự là dấu phân cách để phân tách tên tệp trong trường khớp",
+    "choose.mode": "chọn chế độ",
     "btn.preview": "Xem trước tập tin tải lên"
 }
