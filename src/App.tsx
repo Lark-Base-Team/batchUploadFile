@@ -1,26 +1,18 @@
 import './App.css';
-import { useEffect } from 'react';
-import { bitable, UIBuilder } from "@base-open/web-api";
-import callback from './runUIBuilder';
 import { useTranslation } from 'react-i18next';
-import JsBarcode from 'jsbarcode';
+import React, { Suspense } from 'react';
 
 
 export default function App() {
-    const { t } = useTranslation();
-    useEffect(() => {
-        UIBuilder.getInstance('#container', { bitable, callback: (ui) => callback(ui, t) });
-    }, []);
-    return (<div className='pageRoot'>
-        <div className='mask'></div>
-        <div className='logoContainer'>
-            <img src='url.png' />
-            <img src='txt.png' />
-            <img className='arrowImg' src='Arrow.png'/>
-            <img src='qrcode.png' />
-        </div>
-        <div id='container'></div>
-        <div style={{ display: 'none' }}><canvas id="barcode"></canvas></div>
-    </div >
-    );
+  const { t } = useTranslation();
+  //@ts-ignore
+  window.t = t
+  const UploadFile = React.lazy(() => import('./pages/uploadFile'));
+  const loading = <div className='suspense-loading'>
+  <div className="lds-roller"><div></div><div></div><div></div><div></div><div></div><div></div><div></div><div></div></div>
+  </div>
+
+  return <Suspense fallback={loading}>
+    <UploadFile />
+  </Suspense>;
 }
