@@ -1,13 +1,14 @@
 // @ts-ignore
 import React, { useState, useRef, useEffect, useMemo } from 'react'
-import { Button, Upload, UploadFile, UploadProps, Table, Form, Select, FormInstance, Switch, notification, Spin, Collapse, message } from 'antd'
+import { Button, Upload, UploadFile, UploadProps, Table, Form, Select, FormInstance, Switch, notification, Spin, Collapse, message, Checkbox } from 'antd'
 import { UploadOutlined, FileAddOutlined, CloudUploadOutlined } from '@ant-design/icons';
 import Editor from './codeEditor';
 import './style.css'
 import { FieldType, IBaseViewMeta, IFieldMeta, IOpenAttachment, IOpenCellValue, IWidgetField, IWidgetTable, IWidgetView, TableMeta, ViewType, bitable } from '@lark-base-open/js-sdk';
 import { fieldIcons } from './icons'
 import TextArea from 'antd/es/input/TextArea';
-
+//@ts-ignore
+window._reg = /[\n]+/g
 enum UploadFileActionType {
     /** 自定义pickFile函数.. */
     GetFileByName = 0,
@@ -497,7 +498,7 @@ function UploadFileToForm() {
                         <div key={uploadActionType}>
                             {uploadActionType === UploadFileActionType.GetFileByName && [<Form.Item
                                 name='compares'
-                                rules={[{ required: true }]}
+
                                 tooltip={t('compares.tooltip')}
                                 initialValue={[fieldMetaList?.[0]?.id]}
                                 label={t('select.pickField')}>
@@ -518,16 +519,35 @@ function UploadFileToForm() {
                                     onChange={(v) => { codeEditorValue.current = v }} />
                             }]} defaultActiveKey={['-1']} />,
                             <br />,
-                            <Form.Item initialValue={',，。、;；'} tooltip={t('self.reg.tooltip')} label={t('self.reg')}>
-                                <TextArea defaultValue={', ，。、;；'} onChange={(v) => {
-                                    if (!v.target.value) {
-                                        //@ts-ignore
-                                        window['_reg'] = '';
-                                        return;
-                                    }
-                                    //@ts-ignore
-                                    window['_reg'] = new RegExp(`[${v.target.value}]+`,'g')
-                                }}></TextArea>
+                            <Form.Item initialValue={['\n']} rules={[{ required: true }]}
+                                tooltip={t('self.reg.tooltip')} label={t('self.reg')}>
+
+                                <Checkbox.Group
+                                    onChange={(v) => {
+                                        if (!v || !v?.length) {
+                                            // @ts-ignore
+                                            window._reg = /[]+/g
+                                            return;
+                                        }
+                                        // @ts-ignore
+                                        window['_reg'] = new RegExp(`[${v.join('')}]+`, 'g')
+                                    }}
+                                    defaultValue={['\n']}
+                                    options={[
+                                        { label: t('space'), value: ' ' },
+                                        { label: t('e'), value: '\n' },
+                                        { label: '#', value: '#' },
+                                        { label: '\\', value: '\\\\' },
+                                        { label: '/', value: '/' },
+                                        { label: '|', value: '|' },
+                                        { label: '，', value: '，' },
+                                        { label: '；', value: '；' },
+                                        { label: ';', value: ';' },
+                                        { label: ',', value: ',' },
+
+                                    ]}>
+
+                                </Checkbox.Group>
                             </Form.Item>
                             ]}
                         </div>

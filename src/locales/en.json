@@ -51,5 +51,7 @@
     "code.26": "currentValue: the value of the selected attachment field in the current record",
     "self.reg.tooltip": "Treat each character as a separator to separate the file names in the matching field",
     "choose.mode": "choose mode",
+    "space": "space",
+    "e": "Line break",
     "btn.preview": "File upload preview"
 }

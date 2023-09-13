@@ -51,5 +51,7 @@
     "code.26": "currentValue: giá trị của trường đính kèm đã chọn trong bản ghi hiện tại",
     "self.reg.tooltip": "Coi mỗi ký tự là dấu phân cách để phân tách tên tệp trong trường khớp",
     "choose.mode": "chọn chế độ",
+    "dấu cách": "dấu cách",
+    "e":"Ngắt dòng",
     "btn.preview": "Xem trước tập tin tải lên"
 }

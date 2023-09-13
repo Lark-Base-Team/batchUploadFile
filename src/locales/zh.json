@@ -51,5 +51,7 @@
   "code.26": "currentValue: 当前记录所选附件字段的值",
   "self.reg.tooltip": "将每个字符都当作分隔符，用于分隔匹配字段中的文件名",
   "choose.mode": "选择模式",
+  "space":"空格",
+  "e":"换行符",
   "btn.preview": "文件上传预览"
 }
