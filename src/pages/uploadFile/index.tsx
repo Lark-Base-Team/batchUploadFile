@@ -339,7 +339,7 @@ function UploadFileToForm() {
                 }
                 message.success(t('upload.end'))
             } catch (error) {
-                message.error(t('upload.error'))
+                message.error(t('upload.error') + error)
             }
             setLoading(false);
             setLoadingContent('')
