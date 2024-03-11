@@ -32,7 +32,7 @@
     "upload.by.new.record": "Tải lên hàng loạt tập tin, một tập tin sẽ tạo ra một bản ghi mới",
     "upload.by.new.record.title": "Tải hàng loạt tập tin lên bản ghi mới",
     "upload.by.name.title": "Tải lên tập tin trùng với tên trường",
-    "upload.by.name.desc": "1. Chế độ này hỗ trợ tải tệp lên bản ghi tương ứng với tên tệp. Hãy đảm bảo rằng tên tệp và tên trùng khớp hoàn toàn giống nhau;\n2. Nếu trường khớp chứa nhiều tên, tệp đính kèm cũng sẽ Tự động khớp và tải lên (vui lòng sử dụng,,.,;; dấu cách hoặc dòng mới để phân tách nhiều tên);\n3. Các trường văn bản được hỗ trợ theo mặc định. Nếu bạn cần sử dụng các trường khác, vui lòng tùy chỉnh quy tắc chọn tập tin",
+    "upload.by.name.desc": "1. Chế độ này hỗ trợ tải tệp lên bản ghi tương ứng với tên tệp (không có hậu tố). Hãy đảm bảo rằng tên tệp (không có hậu tố) giống hệt với tên trùng khớp; \n2. Nếu trường khớp chứa nhiều tên, tệp đính kèm cũng sẽ được tự động khớp và tải lên (vui lòng sử dụng,,.,;; dấu cách hoặc dòng mới để phân tách nhiều tên);\n3. Các trường văn bản được hỗ trợ theo mặc định. Nếu bạn cần sử dụng các trường khác, vui lòng tùy chỉnh Xác định quy tắc chọn tệp",
     "code.1": "Chức năng này sẽ hoạt động trên tất cả các bản ghi và sau đó chọn các tập tin cần thiết cho bản ghi",
     "code.2": "Sử dụng văn bản nhiều dòng làm trường nhận dạng và theo tên tệp được điền vào trường nhận dạng (sử dụng,,.,;; phân tách dấu cách hoặc dòng mới), tìm tệp tương ứng trong phần đã chọn tệp và tải nó lên trường đính kèm của bản ghi hàng",
     "code.4": "compareValues: Mảng giá trị ban đầu của ô trường nhận dạng đã chọn của bản ghi hiện tại, theo cùng thứ tự với tùy chọn đã chọn",

@@ -36,7 +36,7 @@ function pickFile({ compareValues, fileList, currentValue }) {
 
     const files = fileList.filter((file) => {
         // ${t('code.9')}
-        const fileName = file.name.split('.')[0]
+        const fileName = file.name.slice(0, file.name.lastIndexOf("."));
         // ${t('code.10')}
         return firstCelValue.includes(fileName)
 

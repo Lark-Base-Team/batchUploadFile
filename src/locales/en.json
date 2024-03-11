@@ -32,7 +32,7 @@
     "upload.by.new.record": "Batch upload files, one file generates a new record",
     "upload.by.new.record.title": "Batch upload files to new records",
     "upload.by.name.title": "Upload file matching field name",
-    "upload.by.name.desc": "1. This mode supports uploading files to the record corresponding to the file name. Please ensure that the file name and the matching name are exactly the same;\n2. If the matching field contains multiple names, the attachment will also Automatically match and upload (please use,,.,;; spaces or newlines to separate multiple names);\n3. Text fields are supported by default. If you need to use other fields, please customize the file selection rules",
+    "upload.by.name.desc": "1. This mode supports uploading files to the record corresponding to the file name(without suffix). Please ensure that the file name(without suffix) and the matching name are exactly the same;\n2. If the matching field contains multiple names, the attachment will also Automatically match and upload (please use,,.,;; spaces or newlines to separate multiple names);\n3. Text fields are supported by default. If you need to use other fields, please customize the file selection rules",
     "code.1": "This function will act on all records and then select the files needed for the record",
     "code.2": "Use a multi-line text as the identification field, and according to the file name filled in the identification field (use,,.,;; space or newline separation), find the corresponding file in the selected file file and upload it to the attachment field of the row record",
     "code.4": "compareValues: The original value array of the selected identification field cell of the current record, in the same order as the selected option",
