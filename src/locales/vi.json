@@ -12,7 +12,7 @@
     "search.table.label": "Tìm kiếm bảng dữ liệu phạm vi",
     "search.table.desc": "Vui lòng chọn bảng dữ liệu",
     "uploading.now": "Đang tải lên:",
-    "upload.error": "Lỗi tải lên",
+    "upload.error": "Lỗi tải lên, (nếu ở client, vui lòng đổi trình duyệt để thử)",
     "function.errot": "Lỗi vận hành hàm",
     "function.dealare.error": "Lỗi khai báo hàm, vui lòng kiểm tra mã",
     "compares.tooltip": "Sử dụng hàm tùy chỉnh pickFile để xác định tập tin nào sẽ được tải lên cho mỗi hàng bản ghi. Các trường được chọn bởi tùy chọn này sẽ được sử dụng làm tham số của hàm pickFile",

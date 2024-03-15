@@ -12,7 +12,7 @@
     "search.table.label": "Search range-data table",
     "search.table.desc": "Please select a data table",
     "uploading.now": "Uploading:",
-    "upload.error": "Upload error",
+    "upload.error": "Upload error, (if in the client, please change the browser to try)",
     "function.errot": "Function operation error",
     "function.dealare.error": "Function declaration error, please check the code",
     "compares.tooltip": "Use the custom function pickFile to determine which files will be uploaded for each row of records. The fields selected by this option will be used as parameters of the pickFile function",

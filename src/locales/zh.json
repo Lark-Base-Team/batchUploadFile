@@ -12,7 +12,7 @@
   "search.table.label": "搜索范围-数据表",
   "search.table.desc": "请选择数据表",
   "uploading.now": "正在上传：",
-  "upload.error": "上传错误",
+  "upload.error": "上传错误，(如在客户端内请更换浏览器尝试)",
   "function.errot": "函数运行错误",
   "function.dealare.error": "函数声明错误，请检查代码",
   "compares.tooltip": "使用自定义函数pickFile来确定每一行记录将上传哪些文件。本选项所选字段将作为pickFile函数的参数",
