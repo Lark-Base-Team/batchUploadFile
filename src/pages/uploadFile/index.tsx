@@ -419,8 +419,6 @@ function UploadFileToForm() {
 
                         setLoadingContent('')
                         setTimeout(() => {
-                            const tableContainer = document.getElementById('btnsContainer');
-                            tableContainer!.scrollIntoView(true);
                             setLoading(false);
                         }, 1000);
 
