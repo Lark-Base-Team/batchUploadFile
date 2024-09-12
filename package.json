@@ -24,7 +24,7 @@
   "dependencies": {
     "@ant-design/icons": "5.2.5",
     "@codemirror/lang-javascript": "6.2.1",
-    "@lark-base-open/js-sdk": "^0.2.1",
+    "@lark-base-open/js-sdk": "^0.4.0",
     "@lezer/highlight": "1.1.6",
     "@uiw/codemirror-themes": "4.21.12",
     "@uiw/react-codemirror": "4.21.12",

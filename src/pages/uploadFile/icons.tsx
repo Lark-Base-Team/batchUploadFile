@@ -1,7 +1,7 @@
 import { FieldType } from '@lark-base-open/js-sdk';
 
 // 从https://universe.bytedance.net/resource/icons 下载的字段的图标
-
+// @ts-ignore
 export const fieldIcons: Record<Exclude<FieldType, 0 | 403>, any> = {
     [FieldType.Rating]: (
         <svg

@@ -4,9 +4,11 @@ import { Button, Upload, UploadFile, UploadProps, Table, Form, Select, FormInsta
 import { UploadOutlined, FileAddOutlined, CloudUploadOutlined } from '@ant-design/icons';
 import Editor from './codeEditor';
 import './style.css'
-import { FieldType, IBaseViewMeta, IFieldMeta, IOpenAttachment, IOpenCellValue, IWidgetField, IWidgetTable, IWidgetView, TableMeta, ViewType, bitable } from '@lark-base-open/js-sdk';
+import { FieldType, IBaseViewMeta, IFieldMeta, IOpenAttachment, IOpenCellValue, IField, ITable, IView, ITableMeta, ViewType, bitable } from '@lark-base-open/js-sdk';
 import { fieldIcons } from './icons'
 import TextArea from 'antd/es/input/TextArea';
+//@ts-ignore
+window.bitable = bitable
 //@ts-ignore
 window._reg = /[\n]+/g
 enum UploadFileActionType {
@@ -139,11 +141,11 @@ function UploadFileToForm() {
     const tableInfo = useRef<
         {
             tableId: string,
-            table: IWidgetTable,
-            tableMetaList: TableMeta[],
+            table: ITable,
+            tableMetaList: ITableMeta[],
             viewMetaList: IBaseViewMeta[],
-            view: IWidgetView | null,
-            attatchmentField: IWidgetField,
+            view: IView | null,
+            attatchmentField: IField,
             viewRecordIdList: string[],
             // 所用到的值列表
             comparesFieldValueList: {
@@ -586,7 +588,8 @@ function UploadFileToForm() {
                             <div className='fileUploadContainer'>
                                 <div className='fileInput'>
                                     <input draggable id='filesInput' type='file' multiple onChange={(e) => {
-                                        setFileList([...e.target.files || []]);
+                                        const filteredFiles = [...e.target.files || []].filter((f) => f.size && f.name);
+                                        setFileList(filteredFiles);
                                         setPreTableFitForm(false)
                                     }}></input>
 
