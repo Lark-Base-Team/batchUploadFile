@@ -1,5 +1,6 @@
 {
   "name": "React Template",
+  "output": "dist",
   "version": "1.0.0",
   "type": "module",
   "description": "React TypeScript on Replit, using Vite bundler",
@@ -24,7 +25,7 @@
   "dependencies": {
     "@ant-design/icons": "5.2.5",
     "@codemirror/lang-javascript": "6.2.1",
-    "@lark-base-open/js-sdk": "^0.4.0",
+    "@lark-base-open/js-sdk": "https://lf3-static.bytednsdoc.com/obj/eden-cn/jjjpceh7nulojvhj/@lark-base-open-js-sdk-0.4.1-rc.7.tgz",
     "@lezer/highlight": "1.1.6",
     "@uiw/codemirror-themes": "4.21.12",
     "@uiw/react-codemirror": "4.21.12",
