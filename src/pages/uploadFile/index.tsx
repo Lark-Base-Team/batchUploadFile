@@ -187,7 +187,7 @@ function UploadFileToForm() {
                     token = recordIdData.pageToken;
                     // setLoadingTip(`${((token > 200 ? (token - 200) : 0) / recordIdData.total * 100).toFixed(2)}%`)
                     recordIdList.push(...recordIdData.recordIds)
-            
+
                 } while (recordIdData.hasMore);
                 // setLoading(false);
                 return recordIdList
@@ -260,7 +260,7 @@ function UploadFileToForm() {
                 token = recordIdData.pageToken;
                 // setLoadingTip(`${((token > 200 ? (token - 200) : 0) / recordIdData.total * 100).toFixed(2)}%`)
                 recordIdList.push(...recordIdData.recordIds)
-        
+
             } while (recordIdData.hasMore);
             // setLoading(false);
             return recordIdList
@@ -340,7 +340,6 @@ function UploadFileToForm() {
         const { tableId, fileFieldId, compares, overWriteFile } = form.getFieldsValue();
         const table = await bitable.base.getTableById(tableId)
 
-        await updateTableInfo();
         if (uploadActionType === UploadFileActionType.AddNewRecord) {
             setLoading(true);
             setPreTable(undefined)
@@ -377,6 +376,7 @@ function UploadFileToForm() {
         }
 
         if (uploadActionType === UploadFileActionType.GetFileByName) {
+            await updateTableInfo();
             const code = codeEditorValue.current
             //@ts-ignore
             window.pickFile = undefined;
@@ -408,7 +408,7 @@ function UploadFileToForm() {
                             token = recordIdData.pageToken;
                             // setLoadingTip(`${((token > 200 ? (token - 200) : 0) / recordIdData.total * 100).toFixed(2)}%`)
                             recordIdList.push(...recordIdData.fieldValues.map((v: any) => { v.record_id = v.recordId; return v }))
-                    
+
                         } while (recordIdData.hasMore);
                         // setLoading(false);
                         return recordIdList
@@ -427,7 +427,7 @@ function UploadFileToForm() {
                         token = recordIdData.pageToken;
                         // setLoadingTip(`${((token > 200 ? (token - 200) : 0) / recordIdData.total * 100).toFixed(2)}%`)
                         recordIdList.push(...recordIdData.fieldValues.map((v: any) => { v.record_id = v.recordId; return v }))
-                
+
                     } while (recordIdData.hasMore);
                     // setLoading(false);
                     return recordIdList
