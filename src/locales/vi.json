@@ -53,5 +53,6 @@
     "choose.mode": "chọn chế độ",
     "dấu cách": "dấu cách",
     "e":"Ngắt dòng",
+    "upload.error.files": "Đã xảy ra lỗi khi tải lên các tệp sau",
     "btn.preview": "Xem trước tập tin tải lên"
 }

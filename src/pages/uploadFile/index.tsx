@@ -344,22 +344,30 @@ function UploadFileToForm() {
             setLoading(true);
             setPreTable(undefined)
             setLoadingContent('')
+            let currentSetFiles: any = [];
             try {
                 for (let index = 0; index < fileList.length; index += 5) {
                     const timeStamp = new Date().getTime();
                     const files = fileList.slice(index, index + 5);
                     const filesName = files.map((f) => f.name).join('，')
                     setLoadingContent(t('uploading.now') + filesName);
-
-                    const tokens = await bitable.base.batchUploadFile(files)
-
-                    const cellValue: IOpenAttachment[] = tokens.map((token, i) => ({
-                        token,
-                        name: files[i].name,
-                        size: files[i].size,
-                        type: files[i].type,
-                        timeStamp
+                    currentSetFiles = files.map((f) => ({
+                        name: f.name,
+                        size: f.size,
+                        type: f.type
                     }))
+                    const tokens = await bitable.base.batchUploadFile(files);
+
+                    const cellValue: IOpenAttachment[] = tokens.map((token, i) => {
+                        currentSetFiles[i].token = token;
+                        return ({
+                            token,
+                            name: files[i].name,
+                            size: files[i].size,
+                            type: files[i].type,
+                            timeStamp
+                        });
+                    });
                     await table.addRecords(cellValue.map((v) => ({
                         fields: {
                             [fileFieldId]: [v]
@@ -368,7 +376,8 @@ function UploadFileToForm() {
                 }
                 message.success(t('upload.end'))
             } catch (error) {
-                message.error(t('upload.error') + error)
+                message.error(`${t('upload.error')}  ${error} \n\n${t('upload.error.files')}\n ${JSON.stringify(
+                    currentSetFiles)}`)
             }
             setLoading(false);
             setLoadingContent('')

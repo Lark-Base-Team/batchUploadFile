@@ -53,5 +53,6 @@
   "choose.mode": "选择模式",
   "space":"空格",
   "e":"换行符",
+  "upload.error.files": "在上传以下文件的时候发生错误",
   "btn.preview": "文件上传预览"
 }

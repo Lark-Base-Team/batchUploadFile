@@ -53,5 +53,6 @@
     "choose.mode": "choose mode",
     "space": "space",
     "e": "Line break",
+    "upload.error.files": "An error occurred while uploading the following files",
     "btn.preview": "File upload preview"
 }
