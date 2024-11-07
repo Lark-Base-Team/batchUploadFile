@@ -335,53 +335,115 @@ function UploadFileToForm() {
     }
 
 
+
+    async function uploadAndAddNewRecord(fileList: File[]) {
+        const { tableId, fileFieldId, compares, overWriteFile } = form.getFieldsValue();
+        const table = await bitable.base.getTableById(tableId);
+        const failedFilesNameErrMap: Map<string, string> = new Map();
+
+        /**
+         * 
+         * @param fileList 待上传的列表
+         * @param nameTokenMap 文件名和batchuploadFile的token
+         * @param remainTryTimes 剩余重试次数。
+         * @returns 
+         */
+        async function loopUpload(fileList: File[], nameTokenMap: Map<string, string> = new Map, remainTryTimes = 1) {
+            let failedFiles: File[] = [];
+            let currentSetFiles: any = [];
+            try {
+                const step = 1;
+                for (let index = 0; index < fileList.length; index += step) {
+                    const timeStamp = new Date().getTime();
+                    const files = fileList.slice(index, index + step);
+                    const filesName = files.map((f) => f.name).join('，')
+                    setLoadingContent(t('uploading.now') + filesName);
+                    currentSetFiles = files.map((f) => ({
+                        name: f.name,
+                        size: f.size,
+                        type: f.type,
+                        timeStamp,
+                    }))
+
+                    try {
+                        const filesWithoutToken = files.filter((f) => !nameTokenMap.get(f.name));
+                        if (filesWithoutToken.length) {
+                            const tokens = await bitable.base.batchUploadFile(filesWithoutToken);
+
+                            filesWithoutToken.forEach((f, i) => {
+                                if (tokens[i]) {
+                                    nameTokenMap.set(f.name, tokens[i]);
+                                }
+                            })
+                        }
+                        const cellValue: IOpenAttachment[] = files.map((f, i) => {
+                            const token = nameTokenMap.get(f.name);
+                            if (!token) {
+                                return null;
+                            }
+                            currentSetFiles[i].token = token;
+                            return ({
+                                token,
+                                name: f.name,
+                                size: f.size,
+                                type: f.type,
+                                timeStamp
+                            });
+                        }).filter((v) => !!v);
+
+                        await table.addRecords(cellValue.map((v) => ({
+                            fields: {
+                                [fileFieldId]: [v]
+                            }
+                        })))
+                    } catch (error) {
+                        // message.warning(`发生错误，稍后将重试${error}`);
+                        console.log('===error', error);
+                        files.forEach((f) => {
+                            failedFilesNameErrMap.set(f.name, String(error));
+                        })
+                        failedFiles.push(...files)
+                    }
+                }
+
+
+            } catch (error) {
+                message.error(`1 ${t('upload.error')}  ${error} \n\n${t('upload.error.files')}\n ${JSON.stringify(
+                    currentSetFiles)}`)
+            }
+            if (failedFiles.length && remainTryTimes >= 1) {
+                return loopUpload(failedFiles, nameTokenMap, remainTryTimes - 1)
+            }
+            return failedFiles;
+        }
+
+        if (uploadActionType === UploadFileActionType.AddNewRecord) {
+            setLoading(true);
+            setPreTable(undefined)
+            setLoadingContent('');
+
+            const failedFiles = await loopUpload(fileList);
+            if (failedFiles.length) {
+                message.error(`2 ${t('upload.error')}\n\n${t('upload.error.files')}\n${failedFiles.map((f) => `${f.name} : ${failedFilesNameErrMap.get(f.name)}`).join('，')}`);
+            } else {
+                message.success(t('upload.end'))
+
+            }
+            setLoading(false);
+            setLoadingContent('')
+            return;
+        }
+
+    }
+
+
     const onFinish = async () => {
 
         const { tableId, fileFieldId, compares, overWriteFile } = form.getFieldsValue();
         const table = await bitable.base.getTableById(tableId)
 
         if (uploadActionType === UploadFileActionType.AddNewRecord) {
-            setLoading(true);
-            setPreTable(undefined)
-            setLoadingContent('')
-            let currentSetFiles: any = [];
-            try {
-                for (let index = 0; index < fileList.length; index += 5) {
-                    const timeStamp = new Date().getTime();
-                    const files = fileList.slice(index, index + 5);
-                    const filesName = files.map((f) => f.name).join('，')
-                    setLoadingContent(t('uploading.now') + filesName);
-                    currentSetFiles = files.map((f) => ({
-                        name: f.name,
-                        size: f.size,
-                        type: f.type
-                    }))
-                    const tokens = await bitable.base.batchUploadFile(files);
-
-                    const cellValue: IOpenAttachment[] = tokens.map((token, i) => {
-                        currentSetFiles[i].token = token;
-                        return ({
-                            token,
-                            name: files[i].name,
-                            size: files[i].size,
-                            type: files[i].type,
-                            timeStamp
-                        });
-                    });
-                    await table.addRecords(cellValue.map((v) => ({
-                        fields: {
-                            [fileFieldId]: [v]
-                        }
-                    })))
-                }
-                message.success(t('upload.end'))
-            } catch (error) {
-                message.error(`${t('upload.error')}  ${error} \n\n${t('upload.error.files')}\n ${JSON.stringify(
-                    currentSetFiles)}`)
-            }
-            setLoading(false);
-            setLoadingContent('')
-            return;
+            return uploadAndAddNewRecord(fileList);
         }
 
         if (uploadActionType === UploadFileActionType.GetFileByName) {
