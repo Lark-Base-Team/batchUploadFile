@@ -352,7 +352,7 @@ function UploadFileToForm() {
             let failedFiles: File[] = [];
             let currentSetFiles: any = [];
             try {
-                const step = 1;
+                const step = 1; // 不改，addRecords好像有问题，改成使用addRecors
                 for (let index = 0; index < fileList.length; index += step) {
                     const timeStamp = new Date().getTime();
                     const files = fileList.slice(index, index + step);
@@ -367,6 +367,7 @@ function UploadFileToForm() {
 
                     try {
                         const filesWithoutToken = files.filter((f) => !nameTokenMap.get(f.name));
+                        let recordIdsToSet = await table.addRecords();
                         if (filesWithoutToken.length) {
                             const tokens = await bitable.base.batchUploadFile(filesWithoutToken);
 
@@ -391,11 +392,11 @@ function UploadFileToForm() {
                             });
                         }).filter((v) => !!v);
 
-                        await table.addRecords(cellValue.map((v) => ({
+                        await table.addRecord({
                             fields: {
-                                [fileFieldId]: [v]
+                                [fileFieldId]: [cellValue[0]]
                             }
-                        })))
+                        })
                     } catch (error) {
                         // message.warning(`发生错误，稍后将重试${error}`);
                         console.log('===error', error);
