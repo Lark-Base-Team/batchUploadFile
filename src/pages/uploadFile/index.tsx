@@ -367,7 +367,6 @@ function UploadFileToForm() {
 
                     try {
                         const filesWithoutToken = files.filter((f) => !nameTokenMap.get(f.name));
-                        let recordIdsToSet = await table.addRecords();
                         if (filesWithoutToken.length) {
                             const tokens = await bitable.base.batchUploadFile(filesWithoutToken);
 
@@ -391,6 +390,8 @@ function UploadFileToForm() {
                                 timeStamp
                             });
                         }).filter((v) => !!v);
+
+                        console.log("====cellValue", cellValue);
 
                         await table.addRecord({
                             fields: {
