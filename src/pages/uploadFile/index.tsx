@@ -348,7 +348,7 @@ function UploadFileToForm() {
          * @param remainTryTimes 剩余重试次数。
          * @returns 
          */
-        async function loopUpload(fileList: File[], nameTokenMap: Map<string, string> = new Map, remainTryTimes = 1) {
+        async function loopUpload(fileList: File[], nameTokenMap: Map<string, string> = new Map, remainTryTimes = 1): Promise<File[]> {
             let failedFiles: File[] = [];
             let currentSetFiles: any = [];
             try {
@@ -376,7 +376,7 @@ function UploadFileToForm() {
                                 }
                             })
                         }
-                        const cellValue: IOpenAttachment[] = files.map((f, i) => {
+                        const cellValue = files.map((f, i) => {
                             const token = nameTokenMap.get(f.name);
                             if (!token) {
                                 return null;
@@ -395,7 +395,7 @@ function UploadFileToForm() {
 
                         await table.addRecord({
                             fields: {
-                                [fileFieldId]: [cellValue[0]]
+                                [fileFieldId]: cellValue.filter(Boolean) as IOpenAttachment[]
                             }
                         })
                     } catch (error) {
@@ -426,7 +426,7 @@ function UploadFileToForm() {
 
             const failedFiles = await loopUpload(fileList);
             if (failedFiles.length) {
-                message.error(`2 ${t('upload.error')}\n\n${t('upload.error.files')}\n${failedFiles.map((f) => `${f.name} : ${failedFilesNameErrMap.get(f.name)}`).join('，')}`);
+                message.error(`2 ${t('upload.error')}\n\n${t('upload.error.files')}\n${failedFiles.map((f: File) => `${f.name} : ${failedFilesNameErrMap.get(f.name)}`).join('，')}`);
             } else {
                 message.success(t('upload.end'))
 
@@ -725,7 +725,7 @@ function UploadFileToForm() {
                                 </div>
                                 <div className='fileInputMask'>
                                     <div className='uploadIcon'>
-                                        <CloudUploadOutlined rev={undefined} />
+                                        <CloudUploadOutlined onPointerEnterCapture={undefined} onPointerLeaveCapture={undefined} />
                                     </div>
                                     <div>
                                         {fileList.length ? <span style={{ color: '#1890ff' }}>{t('selected.num.file', { num: fileList.length })}</span> : t('please.choose.file')}
