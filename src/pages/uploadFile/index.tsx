@@ -29,12 +29,18 @@ function getTemp() {
 function pickFile({ compareValues, fileList, currentValue }) {
     const reg = window._reg || /[,，。、;；\s]+/g
     let firstCelValue = compareValues[0]
-    if (!Array.isArray(firstCelValue)) {
+    if (firstCelValue===null || firstCelValue===undefined) {
         // ${t('code.7')}
         return currentValue
     }
 
-    firstCelValue = firstCelValue.map(({ text }) => text).join('').replace(reg, ',').split(',')
+    if(Array.isArray(firstCelValue)){
+      firstCelValue = firstCelValue.map(({ text }) => text).join('').replace(reg, ',').split(',')
+    }
+
+    if(typeof firstCelValue === 'number'){
+      firstCelValue = [String(firstCelValue)];
+    }
 
     const files = fileList.filter((file) => {
         // ${t('code.9')}
