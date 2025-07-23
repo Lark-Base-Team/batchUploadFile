@@ -46,7 +46,7 @@ function pickFile({ compareValues, fileList, currentValue }) {
         // ${t('code.9')}
         const fileName = file.name.slice(0, file.name.lastIndexOf("."));
         // ${t('code.10')}
-        return firstCelValue.includes(fileName)
+        return firstCelValue.includes(fileName) || firstCelValue.includes(file.name);
 
     })
 

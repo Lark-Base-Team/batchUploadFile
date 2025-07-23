@@ -1,3 +1,14 @@
+// 改这个是不管用的，写好了之后去替换掉getTemp中返回的就可以了.
+
+
+
+
+
+
+
+
+
+
 //本函数将作用于所有记录，然后挑选出该记录所需要用到的文件（优先级低于下方的覆盖已有文件开关）
 /**
  * compareValues：当前记录所选标识字段单元格原始值数组，顺序同选项所选
@@ -22,7 +33,7 @@ function pickFile({ compareValues, fileList, currentValue }) {
         // 文件名（不含文件后缀）
         const fileName = file.name.slice(0, file.name.lastIndexOf("."));
         // 按照标识字段过滤出所需的文件
-        return firstCelValue.includes(fileName);
+        return firstCelValue.includes(fileName) || firstCelValue.includes(file.name);
     });
 
     if (files.length) {
