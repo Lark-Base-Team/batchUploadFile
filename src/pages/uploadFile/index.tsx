@@ -1,7 +1,7 @@
 // @ts-ignore
 import React, { useState, useRef, useEffect, useMemo } from 'react'
-import { Button, Upload, UploadFile, UploadProps, Table, Form, Select, FormInstance, Switch, notification, Spin, Collapse, message, Checkbox } from 'antd'
-import { UploadOutlined, FileAddOutlined, CloudUploadOutlined } from '@ant-design/icons';
+import { Button, Upload, UploadFile, UploadProps, Table, Form, Select, FormInstance, Switch, notification, Spin, Collapse, message, Checkbox, Input, Space, Popconfirm } from 'antd'
+import { UploadOutlined, FileAddOutlined, CloudUploadOutlined, DeleteOutlined, SaveOutlined, CopyOutlined } from '@ant-design/icons';
 import Editor from './codeEditor';
 import './style.css'
 import { FieldType, IBaseViewMeta, IFieldMeta, IOpenAttachment, IOpenCellValue, IField, ITable, IView, ITableMeta, ViewType, bitable } from '@lark-base-open/js-sdk';
@@ -22,39 +22,33 @@ function getTemp() {
     return [{
         code: `//${t('code.23')}
 /**
- * ${t('code.24')}
- * ${t('code.25')}
- * ${t('code.26')}
+ * compareValues：${t('code.24')}
+ * fileList: ${t('code.25')}
+ * currentValue: ${t('code.26')}
  */
 function pickFile({ compareValues, fileList, currentValue }) {
-    const reg = window._reg || /[,，。、;；\s]+/g
-    let firstCelValue = compareValues[0]
-    if (firstCelValue===null || firstCelValue===undefined) {
-        // ${t('code.7')}
-        return currentValue
-    }
-
-    if(Array.isArray(firstCelValue)){
-      firstCelValue = firstCelValue.map(({ text }) => text).join('').replace(reg, ',').split(',')
-    }
-
-    if(typeof firstCelValue === 'number'){
-      firstCelValue = [String(firstCelValue)];
-    }
-
-    const files = fileList.filter((file) => {
-        // ${t('code.9')}
-        const fileName = file.name.slice(0, file.name.lastIndexOf("."));
-        // ${t('code.10')}
-        return firstCelValue.includes(fileName) || firstCelValue.includes(file.name);
-
-    })
-
-    if (files.length) {
-        return files;
-    }
-
-    return currentValue // ${t('code.21')}
+  const reg = window._reg || /[,，。、;；\\s]+/g
+  let firstCelValue = compareValues[0]
+  if (firstCelValue===null || firstCelValue===undefined) {
+    // ${t('code.7')}
+    return currentValue
+  }
+  if(Array.isArray(firstCelValue)){
+    firstCelValue = firstCelValue.map(({ text }) => text).join('').replace(reg, ',').replace(/[<>:"/\\\\|?*\\x00-\\x1F]/g,'_').split(',')
+  }
+  if(typeof firstCelValue === 'number'){
+    firstCelValue = [String(firstCelValue)];
+  }
+  const files = fileList.filter((file) => {
+    // ${t('code.9')}
+    const fileName = file.name.slice(0, file.name.lastIndexOf(".")).replace(/[<>:"/\\\\|?*\\x00-\\x1F]/g,'_');
+    // ${t('code.10')}
+    return firstCelValue.includes(fileName) || firstCelValue.includes(file.name);
+  })
+  if (files.length) {
+    return files;
+  }
+  return currentValue // ${t('code.21')}
 }`,
         desc: t('upload.by.name.desc'),
         title: t('upload.by.name.title'),
@@ -142,6 +136,128 @@ function UploadFileToForm() {
 
     const [uploadActionType, setUploadActionType] = useState(defaultMode.type)
 
+    const [savedRules, setSavedRules] = useState<{ id: string, name: string, code: string }[]>([])
+    const [currentRuleId, setCurrentRuleId] = useState<string>('default')
+    const [ruleName, setRuleName] = useState('')
+
+    useEffect(() => {
+        bitable.bridge.getData('BATCH_UPLOAD_RULES').then((data: any) => {
+            if (data && data.rules) {
+                setSavedRules(data.rules)
+                if (data.lastUsedId) {
+                    const rule = data.rules.find((r: any) => r.id === data.lastUsedId)
+                    if (rule) {
+                        setCurrentRuleId(rule.id)
+                        codeEditorValue.current = rule.code
+                    }
+                }
+            }
+        })
+    }, [])
+
+    const handleSaveRule = () => {
+        if (!ruleName.trim()) {
+            message.error(t('rule.name.placeholder'))
+            return
+        }
+
+        if (currentRuleId === 'default') {
+            // 新建规则 - 检查名称重复
+            const nameExists = savedRules.some(r => r.name === ruleName.trim())
+            if (nameExists) {
+                message.error(t('rule.name.duplicate'))
+                return
+            }
+
+            const newRule = {
+                id: Date.now().toString(),
+                name: ruleName.trim(),
+                code: codeEditorValue.current
+            }
+            const newRules = [...savedRules, newRule]
+            setSavedRules(newRules)
+            setCurrentRuleId(newRule.id)
+            setRuleName(newRule.name)
+            bitable.bridge.setData('BATCH_UPLOAD_RULES', { rules: newRules, lastUsedId: newRule.id })
+            message.success(t('rule.save.success'))
+        } else {
+            // 更新现有规则 - 检查除自身外的名称重复
+            const nameExists = savedRules.some(r => r.name === ruleName.trim() && r.id !== currentRuleId)
+            if (nameExists) {
+                message.error(t('rule.name.duplicate'))
+                return
+            }
+
+            const newRules = savedRules.map(r => {
+                if (r.id === currentRuleId) {
+                    return { ...r, name: ruleName.trim(), code: codeEditorValue.current }
+                }
+                return r
+            })
+            setSavedRules(newRules)
+            bitable.bridge.setData('BATCH_UPLOAD_RULES', { rules: newRules, lastUsedId: currentRuleId })
+            message.success(t('rule.save.success'))
+        }
+    }
+
+    const handleSaveAsRule = () => {
+        if (!ruleName.trim()) {
+            message.error(t('rule.name.placeholder'))
+            return
+        }
+        
+        // 检查名称重复
+        const nameExists = savedRules.some(r => r.name === ruleName.trim())
+        if (nameExists) {
+            message.error(t('rule.name.duplicate'))
+            return
+        }
+
+        // 另存为新规则，强制生成新ID
+        const newRule = {
+            id: Date.now().toString(),
+            name: ruleName.trim(),
+            code: codeEditorValue.current
+        }
+        const newRules = [...savedRules, newRule]
+        setSavedRules(newRules)
+        setCurrentRuleId(newRule.id)
+        setRuleName(newRule.name)
+        bitable.bridge.setData('BATCH_UPLOAD_RULES', { rules: newRules, lastUsedId: newRule.id })
+        message.success(t('rule.save.success'))
+    }
+
+    const handleDeleteRule = () => {
+        const newRules = savedRules.filter(r => r.id !== currentRuleId)
+        setSavedRules(newRules)
+        setCurrentRuleId('default')
+        setRuleName('')
+        const defaultCode = functionsExample.find(v => v.type === UploadFileActionType.GetFileByName)?.code
+        if (defaultCode) {
+            codeEditorValue.current = defaultCode
+        }
+        bitable.bridge.setData('BATCH_UPLOAD_RULES', { rules: newRules, lastUsedId: 'default' })
+        message.success(t('rule.delete.success'))
+    }
+
+    const handleRuleChange = (ruleId: string) => {
+        setCurrentRuleId(ruleId)
+        if (ruleId === 'default') {
+            const defaultCode = functionsExample.find(v => v.type === UploadFileActionType.GetFileByName)?.code
+            if (defaultCode) {
+                codeEditorValue.current = defaultCode
+            }
+            setRuleName('')
+        } else {
+            const rule = savedRules.find(r => r.id === ruleId)
+            if (rule) {
+                codeEditorValue.current = rule.code
+                setRuleName(rule.name)
+            }
+        }
+        bitable.bridge.setData('BATCH_UPLOAD_RULES', { rules: savedRules, lastUsedId: ruleId })
+    }
+
     const codeEditorValue = useRef(defaultMode.code)
     const [form] = Form.useForm()
     const tableInfo = useRef<
@@ -217,8 +333,15 @@ function UploadFileToForm() {
     }, [])
 
     useMemo(() => {
+        if (uploadActionType === UploadFileActionType.GetFileByName && currentRuleId !== 'default') {
+            const rule = savedRules.find(r => r.id === currentRuleId)
+            if (rule) {
+                codeEditorValue.current = rule.code
+                return
+            }
+        }
         codeEditorValue.current = functionsExample.find((v) => v.type === uploadActionType)!.code
-    }, [uploadActionType])
+    }, [uploadActionType, currentRuleId, savedRules])
 
 
 
@@ -648,9 +771,55 @@ function UploadFileToForm() {
                                 >
                                 </Select>
                             </Form.Item>,
+                            <div style={{ marginBottom: 12, border: '1px solid #f0f0f0', padding: 12, borderRadius: 4, background: '#fafafa' }}>
+                                <Form.Item label={t('rule.select')} style={{ marginBottom: 12 }}>
+                                    <Select
+                                        style={{ width: '100%' }}
+                                        value={currentRuleId}
+                                        onChange={handleRuleChange}
+                                        options={[
+                                            { label: t('rule.default'), value: 'default' },
+                                            ...savedRules.map(r => ({ label: r.name, value: r.id }))
+                                        ]}
+                                    />
+                                </Form.Item>
+                                <Form.Item label={t('rule.name')} style={{ marginBottom: 12 }} required={currentRuleId === 'default'}>
+                                    <Input
+                                        placeholder={currentRuleId === 'default' ? t('rule.name.placeholder.new') : t('rule.name.placeholder.edit')}
+                                        value={ruleName}
+                                        onChange={e => setRuleName(e.target.value)}
+                                    />
+                                </Form.Item>
+                                <Space>
+                                    <Button type='primary' icon={
+                                        // @ts-ignore
+                                        <SaveOutlined />
+                                    } onClick={handleSaveRule}>
+                                        {currentRuleId === 'default' ? t('rule.create') : t('rule.update')}
+                                    </Button>
+                                    <Button icon={
+                                        // @ts-ignore
+                                        <CopyOutlined />
+                                    } onClick={handleSaveAsRule}>
+                                        {t('rule.save.as')}
+                                    </Button>
+                                    {currentRuleId !== 'default' && (
+                                        <Popconfirm title={t('rule.delete')} onConfirm={handleDeleteRule}>
+                                            <Button icon={
+                                                // @ts-ignore
+                                                <DeleteOutlined />
+                                            } danger>
+                                                {t('rule.delete')}
+                                            </Button>
+                                        </Popconfirm>
+                                    )}
+                                </Space>
+                            </div>,
                             <Collapse size='small' items={[{
                                 key: '1', label: t('pickFile.label'),
-                                children: <Editor defaultValue={codeEditorValue.current}
+                                children: <Editor 
+                                    key={currentRuleId}
+                                    defaultValue={codeEditorValue.current}
                                     onChange={(v) => { codeEditorValue.current = v }} />
                             }]} defaultActiveKey={['-1']} />,
                             <br />,
@@ -835,7 +1004,7 @@ function getPreviewTable({ fieldsMetaList, fileFieldId, allRecordsIds, compares,
         dataIndex: fileFieldId,
         key: fileFieldId,
         fixed: 'right',
-        width: 100,
+        width: 250,
         render: (cell: File[]) => {
             return <div className='tableCell'>{cell?.map?.((file: File) => file.name).join('\n')}</div>
         }
