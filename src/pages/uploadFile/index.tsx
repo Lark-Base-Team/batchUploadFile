@@ -578,7 +578,10 @@ function UploadFileToForm() {
         }
 
         if (uploadActionType === UploadFileActionType.GetFileByName) {
-            await updateTableInfo();
+            await updateTableInfo().catch((error) => {
+                message.error('updateTableInfo error:' + '\n' + String(error));
+                throw error;
+            });
             const code = codeEditorValue.current
             //@ts-ignore
             window.pickFile = undefined;
@@ -599,14 +602,20 @@ function UploadFileToForm() {
                         [recordId: string]: IOpenCellValue
                     }
                 } = Object.fromEntries(await Promise.all(compares.map(async (fieldId: string) => {
-                    const field = await table.getFieldById(fieldId)
+                    const field = await table.getFieldById(fieldId).catch((error) => {
+                        message.error('getFieldById error:' + '\n' + String(error));
+                        throw error;
+                    });
                     const valueList = await (async (table: any) => {
                         let recordIdData;
                         let token = undefined as any;
                         // setLoading(true);
                         const recordIdList = []
                         do {
-                            recordIdData = await table.getFieldValueListByPage(token ? { pageToken: token, pageSize: 200 } : { pageSize: 200 });
+                            recordIdData = await table.getFieldValueListByPage(token ? { pageToken: token, pageSize: 200 } : { pageSize: 200 }).catch((error: any) => {
+                                message.error('getFieldValueListByPage error:' + '\n' + String(error));
+                                throw error;
+                            });
                             token = recordIdData.pageToken;
                             // setLoadingTip(`${((token > 200 ? (token - 200) : 0) / recordIdData.total * 100).toFixed(2)}%`)
                             recordIdList.push(...recordIdData.fieldValues.map((v: any) => { v.record_id = v.recordId; return v }))
@@ -618,14 +627,20 @@ function UploadFileToForm() {
                     const values = Object.fromEntries(valueList.map(({ record_id, value }) => [record_id, value]))
                     return [fieldId, values]
                 })))
-                const fileField = await table.getFieldById(fileFieldId)
+                const fileField = await table.getFieldById(fileFieldId).catch((error: any) => {
+                    message.error('getFieldById error:' + '\n' + String(error));
+                    throw error;
+                });
                 const fileFieldValue = await (async (table: any) => {
                     let recordIdData;
                     let token = undefined as any;
                     // setLoading(true);
                     const recordIdList = []
                     do {
-                        recordIdData = await table.getFieldValueListByPage(token ? { pageToken: token, pageSize: 200 } : { pageSize: 200 });
+                        recordIdData = await table.getFieldValueListByPage(token ? { pageToken: token, pageSize: 200 } : { pageSize: 200 }).catch((error: any) => {
+                            message.error('getFieldValueListByPage error:' + '\n' + String(error));
+                            throw error;
+                        });
                         token = recordIdData.pageToken;
                         // setLoadingTip(`${((token > 200 ? (token - 200) : 0) / recordIdData.total * 100).toFixed(2)}%`)
                         recordIdList.push(...recordIdData.fieldValues.map((v: any) => { v.record_id = v.recordId; return v }))
