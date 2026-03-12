@@ -205,7 +205,7 @@ function UploadFileToForm() {
             message.error(t('rule.name.placeholder'))
             return
         }
-        
+
         // 检查名称重复
         const nameExists = savedRules.some(r => r.name === ruleName.trim())
         if (nameExists) {
@@ -695,7 +695,7 @@ function UploadFileToForm() {
 
                 // const 
             } catch (error) {
-                message.error(t('function.dealare.error'))
+                message.error(t('function.dealare.error') + '\n' + String(error))
                 setLoadingContent('')
                 setLoading(false)
             }
@@ -817,7 +817,7 @@ function UploadFileToForm() {
                             </div>,
                             <Collapse size='small' items={[{
                                 key: '1', label: t('pickFile.label'),
-                                children: <Editor 
+                                children: <Editor
                                     key={currentRuleId}
                                     defaultValue={codeEditorValue.current}
                                     onChange={(v) => { codeEditorValue.current = v }} />
