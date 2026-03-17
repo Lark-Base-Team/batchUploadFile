@@ -27,23 +27,59 @@ function getTemp() {
  * currentValue: ${t('code.26')}
  */
 function pickFile({ compareValues, fileList, currentValue }) {
-  const reg = window._reg || /[,，。、;；\\s]+/g
-  let firstCelValue = compareValues[0]
-  if (firstCelValue===null || firstCelValue===undefined) {
+  const reg = window._reg instanceof RegExp ? window._reg : /[,，。、;；\\s]+/g
+  const firstCellValue = compareValues && compareValues.length ? compareValues[0] : null
+  if (firstCellValue === null || firstCellValue === undefined) {
     // ${t('code.7')}
     return currentValue
   }
-  if(Array.isArray(firstCelValue)){
-    firstCelValue = firstCelValue.map(({ text }) => text).join('').replace(reg, ',').replace(/[<>:"/\\\\|?*\\x00-\\x1F]/g,'_').split(',')
+
+  function normalizeName(input) {
+    let str = input === null || input === undefined ? '' : String(input)
+    if (typeof str.normalize === 'function') {
+      str = str.normalize('NFC')
+    }
+    str = str.trim()
+    return str.replace(/[<>:"/\\\\|?*\\x00-\\x1F]/g, '_')
   }
-  if(typeof firstCelValue === 'number'){
-    firstCelValue = [String(firstCelValue)];
+
+  function toText(value) {
+    if (Array.isArray(value)) {
+      return value
+        .map((v) => {
+          if (v && typeof v === 'object' && 'text' in v) return v.text
+          return v === null || v === undefined ? '' : String(v)
+        })
+        .join('')
+    }
+    if (value && typeof value === 'object' && 'text' in value) {
+      return value.text
+    }
+    return String(value)
   }
+
+  const raw = toText(firstCellValue)
+  const parts = raw.split(reg).map((s) => s.trim()).filter(Boolean)
+  if (!parts.length) return currentValue
+
+  const wantedRaw = new Set(parts)
+  const wantedNorm = new Set(parts.map(normalizeName))
+
   const files = fileList.filter((file) => {
+    const name = file && file.name ? String(file.name) : ''
+    if (!name) return false
     // ${t('code.9')}
-    const fileName = file.name.slice(0, file.name.lastIndexOf(".")).replace(/[<>:"/\\\\|?*\\x00-\\x1F]/g,'_');
+    const dot = name.lastIndexOf('.')
+    const prefix = dot > 0 ? name.slice(0, dot) : name
+    const nameNorm = normalizeName(name)
+    const prefixNorm = normalizeName(prefix)
     // ${t('code.10')}
-    return firstCelValue.includes(fileName) || firstCelValue.includes(file.name);
+    return (
+      wantedRaw.has(prefix) ||
+      wantedRaw.has(name) ||
+      wantedNorm.has(prefixNorm) ||
+      wantedNorm.has(nameNorm)
+    )
   })
   if (files.length) {
     return files;
