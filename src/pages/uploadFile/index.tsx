@@ -600,12 +600,22 @@ function UploadFileToForm({ currentSelection, selectionContext }: { currentSelec
         const total = totalSet.size
         let done = 0
         setUploadProgress(total > 0 ? { done: 0, total, percent: 0 } : null)
+
+        const isEmptyAttachmentValue = (v: any) => {
+            if (v === null || v === undefined) return true
+            if (Array.isArray(v)) return v.length === 0
+            return false
+        }
         try {
             for (const [recordId, files] of recordFiles) {
                 if (files === undefined) {
                     continue;
                 }
+                const currentCellValue = tableInfo.current?.exitFileValueList?.[recordId]
+                const currentIsEmpty = isEmptyAttachmentValue(currentCellValue)
                 if (files === null) {
+                    // Skip no-op: already empty.
+                    if (currentIsEmpty) continue
                     await table?.setCellValue(fieldId, recordId, null);
                     continue
                 }
@@ -653,7 +663,10 @@ function UploadFileToForm({ currentSelection, selectionContext }: { currentSelec
                         timeStamp,
                     }
                 })
-                await table?.setCellValue(fieldId, recordId, cellValue)
+                const nextIsEmpty = !cellValue || cellValue.length === 0
+                // Skip no-op: setting empty while already empty.
+                if (nextIsEmpty && currentIsEmpty) continue
+                await table?.setCellValue(fieldId, recordId, nextIsEmpty ? null : cellValue)
 
             }
             setUploadEnd(true)
@@ -1095,7 +1108,7 @@ function UploadFileToForm({ currentSelection, selectionContext }: { currentSelec
                                 valuePropName='checked'
                                 label={t('overWrite.exit.file')}
                                 hidden={uploadActionType === UploadFileActionType.AddNewRecord}
-                                initialValue={true}>
+                                initialValue={false}>
                                 <Switch onChange={() => {
                                     setPreTableFitForm(false)
                                 }}></Switch>
