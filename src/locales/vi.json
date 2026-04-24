@@ -54,5 +54,9 @@
     "dấu cách": "dấu cách",
     "e":"Ngắt dòng",
     "upload.error.files": "Đã xảy ra lỗi khi tải lên các tệp sau",
-    "btn.preview": "Xem trước tập tin tải lên"
+    "btn.preview": "Xem trước tập tin tải lên",
+    "current.processing": "Đang xử lý: {{tableName}} > {{viewName}}",
+    "selection.missing": "Vui lòng chọn bảng và chế độ xem trước",
+    "loading.records.progress": "Đang tải bản ghi: {{loaded}}/{{total}} ({{percent}}%)",
+    "upload.progress": "Tiến độ tải lên: {{done}}/{{total}} ({{percent}}%)"
 }

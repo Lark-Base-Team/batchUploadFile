@@ -1,10 +1,10 @@
 // @ts-ignore
 import React, { useState, useRef, useEffect, useMemo } from 'react'
-import { Button, Upload, UploadFile, UploadProps, Table, Form, Select, FormInstance, Switch, notification, Spin, Collapse, message, Checkbox, Input, Space, Popconfirm } from 'antd'
+import { Button, Upload, UploadFile, UploadProps, Table, Form, Select, FormInstance, Switch, notification, Spin, Collapse, message, Checkbox, Input, Space, Popconfirm, Progress } from 'antd'
 import { UploadOutlined, FileAddOutlined, CloudUploadOutlined, DeleteOutlined, SaveOutlined, CopyOutlined } from '@ant-design/icons';
 import Editor from './codeEditor';
 import './style.css'
-import { FieldType, IBaseViewMeta, IFieldMeta, IOpenAttachment, IOpenCellValue, IField, ITable, IView, ITableMeta, ViewType, bitable } from '@lark-base-open/js-sdk';
+import { FieldType, IBaseViewMeta, IFieldMeta, IOpenAttachment, IOpenCellValue, IField, ITable, IView, ITableMeta, ViewType, bitable, IRecord } from '@lark-base-open/js-sdk';
 import { fieldIcons } from './icons'
 import TextArea from 'antd/es/input/TextArea';
 //@ts-ignore
@@ -16,6 +16,91 @@ enum UploadFileActionType {
     GetFileByName = 0,
     /** 新增一行记录并依次上传文件，一行记录对应一个文件 */
     AddNewRecord = 1
+}
+
+type TableRecordsCacheEntry = {
+    fieldSet: Set<string>,
+    promise: Promise<{ recordIds: string[], records: IRecord[] }>,
+}
+
+const tableRecordsCache = new Map<string, TableRecordsCacheEntry>()
+
+function normalizeFieldIds(fields?: string[]) {
+    if (!fields?.length) return []
+    return Array.from(new Set(fields.filter(Boolean))).sort()
+}
+
+function isSuperset(set: Set<string>, subset: Set<string>) {
+    for (const v of subset) {
+        if (!set.has(v)) return false
+    }
+    return true
+}
+
+async function loadTableRecords(
+    table: ITable,
+    viewId: string,
+    forceReload = false,
+    fields?: string[],
+    onProgress?: (p: { loaded: number, total?: number, percent?: number }) => void
+) {
+    const cacheKey = `${table.id}:${viewId}`
+    const wantedFieldIds = normalizeFieldIds(fields)
+    const wantedSet = new Set(wantedFieldIds)
+
+    if (forceReload) {
+        tableRecordsCache.delete(cacheKey)
+    }
+
+    const cached = tableRecordsCache.get(cacheKey)
+    if (cached && isSuperset(cached.fieldSet, wantedSet)) {
+        return cached.promise
+    }
+
+    // Only keep fields we actually need in memory. If subsequent calls need more fields,
+    // we reload and expand the cached fieldSet.
+    const fieldSet = cached ? new Set([...cached.fieldSet, ...wantedSet]) : wantedSet
+
+    const task = (async () => {
+        let recordData: any;
+        let token = undefined as any;
+        const records: IRecord[] = []
+        const recordIdList: string[] = []
+        const totalGetter = (d: any) => (typeof d?.total === 'number' ? d.total : undefined)
+        const updateProgress = () => {
+            const total = totalGetter(recordData)
+            const loaded = recordIdList.length
+            const percent = total && total > 0 ? Math.min(100, Math.max(0, Math.round((loaded / total) * 100))) : undefined
+            onProgress?.({ loaded, total, percent })
+        }
+        do {
+            console.log('=== loadTableRecords page', { tableId: table.id, viewId, pageToken: token })
+            recordData = await table.getRecordsByPage(
+                token
+                    ? { pageToken: token, pageSize: 200, viewId, stringValue: false }
+                    : { pageSize: 200, viewId, stringValue: false }
+            )
+            token = recordData.pageToken;
+
+            recordData.records.forEach((r: any) => {
+                const picked: any = {}
+                fieldSet.forEach((fid) => {
+                    picked[fid] = r.fields[fid]
+                })
+                records.push({ recordId: r.recordId, fields: picked } as any)
+                if (r.recordId) recordIdList.push(r.recordId)
+            })
+            updateProgress()
+        } while (recordData.hasMore);
+        console.log('=== loadTableRecords done', { tableId: table.id, viewId, recordCount: recordIdList.length, fieldCount: fieldSet.size })
+        return { recordIds: recordIdList, records }
+    })().catch((error) => {
+        tableRecordsCache.delete(cacheKey)
+        throw error
+    })
+
+    tableRecordsCache.set(cacheKey, { fieldSet, promise: task })
+    return task
 }
 
 function getTemp() {
@@ -135,30 +220,107 @@ const fielTokenMap = new Map<File, string>()
 /* 记录需要改动的记录,null清空，undefined表示使用原来的值 */
 const recordFiles = new Map<string, (File | IOpenAttachment)[] | null | undefined>()
 
+type CurrentSelection = {
+    tableId?: string,
+    viewId?: string,
+}
+
+type SelectionContext = {
+    tableId: string,
+    viewId: string,
+    tableName: string,
+    viewName: string,
+    table: ITable,
+    view: IView,
+    tableMetaList: ITableMeta[],
+    viewMetaList: IBaseViewMeta[],
+    fieldMetaList: IFieldMeta[],
+    defaultFileFieldId?: string,
+    defaultCompareIds: string[],
+}
+
 export default function RefreshCom() {
-    const [selectionChange, setSelectionChange] = useState<any>();
+    const [selection, setSelection] = useState<CurrentSelection>();
+    const [selectionContext, setSelectionContext] = useState<SelectionContext>();
     useEffect(() => {
-        bitable.base.getSelection().then(({ tableId }) => {
-            setSelectionChange(tableId)
+        let dispose: undefined | (() => void)
+        bitable.base.getSelection().then(({ tableId, viewId }) => {
+            setSelection({ tableId: tableId || undefined, viewId: viewId || undefined })
         })
-        bitable.base.onSelectionChange((selection) => {
-            setSelectionChange(selection.data.tableId);
+        dispose = bitable.base.onSelectionChange((selection) => {
+            setSelection({
+                tableId: selection.data.tableId || undefined,
+                viewId: selection.data.viewId || undefined,
+            });
         })
+        return () => {
+            dispose?.()
+        }
     }, [])
-    if (!selectionChange) {
-        return null
+
+    useEffect(() => {
+        let cancelled = false
+        const { tableId, viewId } = selection || {}
+        if (!tableId || !viewId) {
+            setSelectionContext(undefined)
+            return
+        }
+        (async () => {
+            console.log('=== RefreshCom load selection context start', { tableId, viewId })
+            const [table, tableMetaList] = await Promise.all([
+                bitable.base.getTableById(tableId),
+                bitable.base.getTableMetaList()
+            ])
+            const [view, viewMetaList] = await Promise.all([
+                table.getViewById(viewId),
+                table.getViewMetaList()
+            ])
+            const fieldMetaList = await view.getFieldMetaList()
+            const attachmentFields = fieldMetaList.filter(({ type }) => type === FieldType.Attachment)
+            const tableName = tableMetaList.find(({ id }) => id === tableId)?.name || tableId
+            const viewName = viewMetaList.find(({ id }) => id === viewId)?.name || viewId
+            const ctx: SelectionContext = {
+                tableId,
+                viewId,
+                tableName,
+                viewName,
+                table,
+                view,
+                tableMetaList,
+                viewMetaList: viewMetaList.filter(({ type }) => type === ViewType.Grid),
+                fieldMetaList,
+                defaultFileFieldId: attachmentFields[0]?.id,
+                defaultCompareIds: fieldMetaList[0]?.id ? [fieldMetaList[0].id] : [],
+            }
+            if (cancelled) return
+            setSelectionContext(ctx)
+            console.log('=== RefreshCom load selection context done', { tableId, viewId })
+        })().catch((error) => {
+            console.log('=== RefreshCom load selection context error', error)
+        });
+        return () => {
+            cancelled = true
+        }
+    }, [selection?.tableId, selection?.viewId])
+
+    if (!selection?.tableId || !selection?.viewId) {
+        return <h1>{t('selection.missing')}</h1>
+    }
+
+    if (!selectionContext || selectionContext.tableId !== selection.tableId || selectionContext.viewId !== selection.viewId) {
+        return <Spin spinning={true}>1</Spin>
     }
 
     return <div>
-        <UploadFileToForm key={selectionChange || '0'} />
+        <UploadFileToForm currentSelection={selection} selectionContext={selectionContext} />
     </div>
 }
 
 
-function UploadFileToForm() {
+function UploadFileToForm({ currentSelection, selectionContext }: { currentSelection: CurrentSelection, selectionContext: SelectionContext }) {
     const functionsExample = useMemo(() => getTemp(), [])
     const [fileList, setFileList] = useState<File[]>([]);
-    const [loading, setLoading] = useState(true);
+    const [loading, setLoading] = useState(false);
     const defaultMode = functionsExample.find((v) => v.default)!
     // 已上传完成
     const [uploadEnd, setUploadEnd] = useState(false)
@@ -166,6 +328,7 @@ function UploadFileToForm() {
     // 预览表格是否符合表单所选项目
     const [preTableFitForm, setPreTableFitForm] = useState(false)
     const [loadingContent, setLoadingContent] = useState('')
+    const [uploadProgress, setUploadProgress] = useState<null | { done: number, total: number, percent: number }>(null)
     const [fieldMetaList, setFieldMetaList] = useState<IFieldMeta[]>()
 
     const [PreTable, setPreTable] = useState<any>(null)
@@ -175,6 +338,12 @@ function UploadFileToForm() {
     const [savedRules, setSavedRules] = useState<{ id: string, name: string, code: string }[]>([])
     const [currentRuleId, setCurrentRuleId] = useState<string>('default')
     const [ruleName, setRuleName] = useState('')
+    const [currentLocation, setCurrentLocation] = useState({
+        tableId: '',
+        tableName: '',
+        viewId: '',
+        viewName: '',
+    })
 
     useEffect(() => {
         bitable.bridge.getData('BATCH_UPLOAD_RULES').then((data: any) => {
@@ -313,60 +482,97 @@ function UploadFileToForm() {
             },
             /** 已经存在的文件值的列表 */
             exitFileValueList: {
-                [recordId: string]: any[]
+                [recordId: string]: IOpenCellValue
             }
         }
     >()
 
-    const updateTableInfo = async () => {
-        setLoading(true)
+    const applySelectionContext = (selection: CurrentSelection = currentSelection, options?: { resetRecords?: boolean }) => {
+        const { tableId, viewId } = selectionContext
+        if (!tableId || !viewId || selection.tableId !== tableId || selection.viewId !== viewId) {
+            return
+        }
 
-        return bitable.base.getSelection().then(async ({ tableId, viewId }) => {
-
-            const [table, tableMetaList] = await Promise.all([
-                bitable.base.getTableById(tableId!),
-                bitable.base.getTableMetaList()
-            ])
-
-            const view = await table.getViewById(viewId!);
-            const fieldMetaList = await view.getFieldMetaList();
-            const viewMetaList = await table.getViewMetaList();
-            setFieldMetaList(fieldMetaList)
-            if (!fieldMetaList.some(({ type }) => type === FieldType.Attachment)) {
-                message.error(t('file.field.missing'));
-            }
-            const viewRecordIdList = await (async (table: any) => {
-                let recordIdData;
-                let token = undefined as any;
-                // setLoading(true);
-                const recordIdList = []
-                do {
-                    recordIdData = await table.getVisibleRecordIdListByPage(token ? { pageToken: token, pageSize: 200 } : { pageSize: 200 });
-                    token = recordIdData.pageToken;
-                    // setLoadingTip(`${((token > 200 ? (token - 200) : 0) / recordIdData.total * 100).toFixed(2)}%`)
-                    recordIdList.push(...recordIdData.recordIds)
-
-                } while (recordIdData.hasMore);
-                // setLoading(false);
-                return recordIdList
-            })(view) as any;
-            tableInfo.current = {
-                ...tableInfo.current || {}
-                , tableId: tableId!,
-                table,
-                view,
-                tableMetaList,
-                viewRecordIdList,
-                viewMetaList: viewMetaList.filter(({ type }) => type === ViewType.Grid),
-            } as any;
-            setLoading(false);
+        const { table, view, tableMetaList, viewMetaList, fieldMetaList } = selectionContext
+        setFieldMetaList(fieldMetaList)
+        const attachmentFields = fieldMetaList.filter(({ type }) => type === FieldType.Attachment)
+        if (!attachmentFields.length) {
+            message.error(t('file.field.missing'));
+        }
+        setCurrentLocation({
+            tableId,
+            tableName: selectionContext.tableName || tableId,
+            viewId,
+            viewName: selectionContext.viewName || viewId,
         })
+
+        tableInfo.current = {
+            ...tableInfo.current || {}
+            , tableId,
+            table,
+            view,
+            tableMetaList,
+            viewRecordIdList: options?.resetRecords ? [] : (tableInfo.current?.viewRecordIdList || []),
+            viewMetaList,
+        } as any;
+
+        form.setFieldsValue({
+            tableId,
+            viewId,
+            fileFieldId: selectionContext.defaultFileFieldId,
+            compares: selectionContext.defaultCompareIds.length ? selectionContext.defaultCompareIds : undefined,
+        })
+        return { table, view, fieldMetaList }
+    }
+
+    const updateTableInfo = async (selection: CurrentSelection = currentSelection, options?: { loadRecords?: boolean, forceReload?: boolean }) => {
+        setLoading(true)
+        const applied = applySelectionContext(selection)
+        if (!applied) {
+            setLoading(false)
+            return
+        }
+
+        const { table, view, fieldMetaList } = applied
+        let viewRecordIdList: string[] = []
+        let records: IRecord[] = []
+        if (options?.loadRecords) {
+            setLoadingContent(t('loading.records.progress', { loaded: 0, total: '-', percent: '-' }))
+            const currentFormValues = form.getFieldsValue(['fileFieldId', 'compares'])
+            const compareIds: string[] = Array.isArray(currentFormValues.compares) ? currentFormValues.compares : []
+            const needFieldIds = Array.from(new Set([...(compareIds || []), currentFormValues.fileFieldId].filter(Boolean)))
+            const result = await loadTableRecords(
+                table,
+                selectionContext.viewId,
+                options.forceReload,
+                needFieldIds,
+                ({ loaded, total, percent }) => {
+                    setLoadingContent(t('loading.records.progress', {
+                        loaded,
+                        total: total ?? '-',
+                        percent: percent ?? '-',
+                    }))
+                }
+            )
+            viewRecordIdList = result.recordIds.filter(Boolean)
+            records = result.records
+            if (tableInfo.current) {
+                tableInfo.current.viewRecordIdList = viewRecordIdList
+            }
+        }
+
+        setLoading(false);
+        return { table, view, records, viewRecordIdList, fieldMetaList }
     }
 
 
     useEffect(() => {
-        updateTableInfo()
-    }, [])
+        recordFiles.clear()
+        setPreTable(null)
+        setPreTableFitForm(false)
+        setUploadEnd(false)
+        applySelectionContext(currentSelection, { resetRecords: true })
+    }, [currentSelection.tableId, currentSelection.viewId])
 
     useMemo(() => {
         if (uploadActionType === UploadFileActionType.GetFileByName && currentRuleId !== 'default') {
@@ -378,74 +584,22 @@ function UploadFileToForm() {
         }
         codeEditorValue.current = functionsExample.find((v) => v.type === uploadActionType)!.code
     }, [uploadActionType, currentRuleId, savedRules])
-
-
-
-    const onSelectTable = async (tableId: string) => {
-        setLoading(true)
-        setFieldMetaList([])
-        form.setFieldsValue({
-            viewId: undefined,
-            fileFieldId: undefined,
-            compares: undefined
-        })
-
-        tableInfo.current!.tableId = tableId;
-        const table = await bitable.base.getTableById(tableId)
-        const viewMetaList = await table.getViewMetaList()
-
-        tableInfo.current = {
-            ...tableInfo.current,
-            tableId,
-            viewMetaList: viewMetaList.filter(({ type }) => type === ViewType.Grid),
-            table,
-            view: null,
-            viewRecordIdList: [],
-        } as any
-        const fieldMetaList = await table.getFieldMetaList();
-        setFieldMetaList(fieldMetaList)
-        setLoading(false)
-    }
-
-    const onSelectView = async (viewId: string) => {
-        setLoading(true)
-        const { table } = tableInfo.current!
-        form.setFieldsValue({
-            fileFieldId: undefined,
-            compares: undefined
-        })
-        const view = await table.getViewById(viewId);
-        const viewRecordIdList = await (async (table: any) => {
-            let recordIdData;
-            let token = undefined as any;
-            // setLoading(true);
-            const recordIdList = []
-            do {
-                recordIdData = await table.getVisibleRecordIdListByPage(token ? { pageToken: token, pageSize: 200 } : { pageSize: 200 });
-                token = recordIdData.pageToken;
-                // setLoadingTip(`${((token > 200 ? (token - 200) : 0) / recordIdData.total * 100).toFixed(2)}%`)
-                recordIdList.push(...recordIdData.recordIds)
-
-            } while (recordIdData.hasMore);
-            // setLoading(false);
-            return recordIdList
-        })(view);
-        const fieldMetaList = await view.getFieldMetaList();
-        setFieldMetaList(fieldMetaList)
-        tableInfo.current = {
-            ...tableInfo.current,
-            viewRecordIdList: viewRecordIdList.filter((recordId) => recordId) as any,
-            view,
-        } as any
-        setLoading(false)
-    }
-
-
     const onClickUpload = async () => {
         const fieldId: string = form.getFieldValue('fileFieldId');
         const table = tableInfo.current?.table
         setLoading(true)
         setLoadingContent('')
+        // Upload progress for new File objects only (already-tokened files are ignored).
+        const totalSet = new Set<File>()
+        for (const [, files] of recordFiles) {
+            if (!files || files === undefined) continue
+            files.forEach((f: any) => {
+                if (f instanceof File && !fielTokenMap.has(f)) totalSet.add(f)
+            })
+        }
+        const total = totalSet.size
+        let done = 0
+        setUploadProgress(total > 0 ? { done: 0, total, percent: 0 } : null)
         try {
             for (const [recordId, files] of recordFiles) {
                 if (files === undefined) {
@@ -458,7 +612,10 @@ function UploadFileToForm() {
 
                 const timeStamp = new Date().getTime();
                 const currentUploadingFies: string = files.map(({ name }) => name).join('，');
-                setLoadingContent(t('uploading.now') + currentUploadingFies)
+                setLoadingContent(
+                    `${t('uploading.now')}${currentUploadingFies}\n` +
+                    `${t('upload.progress', { done, total, percent: total ? Math.round((done / total) * 100) : 0 })}`
+                )
                 const allFilesToBeUpload: File[] = files.filter((f) => (f instanceof File) && !fielTokenMap.has(f)) as any
                 for (let index = 0; index < allFilesToBeUpload.length; index += 5) {
                     const elements: (File)[] = allFilesToBeUpload.slice(index, index + 5)
@@ -472,6 +629,15 @@ function UploadFileToForm() {
                             fielTokenMap.set(f, tokens[index]);
                         }
                     })
+                    done += elements.length
+                    if (total > 0) {
+                        const percent = Math.min(100, Math.max(0, Math.round((done / total) * 100)))
+                        setUploadProgress({ done, total, percent })
+                        setLoadingContent(
+                            `${t('uploading.now')}${currentUploadingFies}\n` +
+                            `${t('upload.progress', { done, total, percent })}`
+                        )
+                    }
                 }
 
                 const cellValue: IOpenAttachment[] = files.map((f) => {
@@ -496,15 +662,21 @@ function UploadFileToForm() {
             message.error(t('upload.error') + '\n' + String(error))
         }
         setLoadingContent('')
+        setUploadProgress(null)
         setLoading(false)
     }
 
 
 
     async function uploadAndAddNewRecord(fileList: File[]) {
-        const { tableId, fileFieldId, compares, overWriteFile } = form.getFieldsValue();
-        const table = await bitable.base.getTableById(tableId);
+        const { fileFieldId } = form.getFieldsValue();
+        const table = tableInfo.current!.table;
         const failedFilesNameErrMap: Map<string, string> = new Map();
+        const progressState = {
+            total: fileList.length,
+            processedOnce: new Set<File>(),
+            done: 0,
+        }
 
         /**
          * 
@@ -522,7 +694,25 @@ function UploadFileToForm() {
                     const timeStamp = new Date().getTime();
                     const files = fileList.slice(index, index + step);
                     const filesName = files.map((f) => f.name).join('，')
-                    setLoadingContent(t('uploading.now') + filesName);
+                    // Keep progress monotonic even if we retry failed files.
+                    files.forEach((f) => {
+                        if (!progressState.processedOnce.has(f)) {
+                            progressState.processedOnce.add(f)
+                            progressState.done += 1
+                            const percent = progressState.total
+                                ? Math.min(100, Math.max(0, Math.round((progressState.done / progressState.total) * 100)))
+                                : 0
+                            setUploadProgress({ done: progressState.done, total: progressState.total, percent })
+                        }
+                    })
+                    setLoadingContent(
+                        `${t('uploading.now')}${filesName}\n` +
+                        `${t('upload.progress', {
+                            done: progressState.done,
+                            total: progressState.total,
+                            percent: progressState.total ? Math.round((progressState.done / progressState.total) * 100) : 0
+                        })}`
+                    );
                     currentSetFiles = files.map((f) => ({
                         name: f.name,
                         size: f.size,
@@ -588,16 +778,18 @@ function UploadFileToForm() {
             setLoading(true);
             setPreTable(undefined)
             setLoadingContent('');
+            setUploadProgress(progressState.total > 0 ? { done: 0, total: progressState.total, percent: 0 } : null)
 
             const failedFiles = await loopUpload(fileList);
             if (failedFiles.length) {
-                message.error(`2 ${t('upload.error')}\n\n${t('upload.error.files')}\n${failedFiles.map((f: File) => `${f.name} : ${failedFilesNameErrMap.get(f.name)}`).join('，')}`);
+                message.error(`2 ${t('upload.error')}\n\n${t('upload.error.files')}\n${failedFiles?.map((f: File) => `${f.name} : ${failedFilesNameErrMap.get(f.name)}`).join('，')}`);
             } else {
                 message.success(t('upload.end'))
 
             }
             setLoading(false);
             setLoadingContent('')
+            setUploadProgress(null)
             return;
         }
 
@@ -606,18 +798,25 @@ function UploadFileToForm() {
 
     const onFinish = async () => {
 
-        const { tableId, fileFieldId, compares, overWriteFile } = form.getFieldsValue();
-        const table = await bitable.base.getTableById(tableId)
+        const { fileFieldId, compares, overWriteFile } = form.getFieldsValue();
+        console.log('=== onFinish start', { tableId: currentSelection.tableId, viewId: currentSelection.viewId, fileFieldId, compares, overWriteFile, uploadActionType, fileCount: fileList.length })
 
         if (uploadActionType === UploadFileActionType.AddNewRecord) {
+            console.log('=== onFinish uploadActionType AddNewRecord')
             return uploadAndAddNewRecord(fileList);
         }
 
         if (uploadActionType === UploadFileActionType.GetFileByName) {
-            await updateTableInfo().catch((error) => {
+            console.log('=== onFinish updateTableInfo start')
+            const tableResult = await updateTableInfo(currentSelection, { loadRecords: true, forceReload: true }).catch((error) => {
+                console.log('=== onFinish updateTableInfo error', error)
                 message.error('updateTableInfo error:' + '\n' + String(error));
                 throw error;
             });
+            console.log('=== onFinish updateTableInfo done')
+            const table = tableResult!.table
+            const records = tableResult!.records
+            tableInfo.current!.viewRecordIdList = tableResult!.viewRecordIdList
             const code = codeEditorValue.current
             //@ts-ignore
             window.pickFile = undefined;
@@ -625,119 +824,97 @@ function UploadFileToForm() {
             setLoadingContent('')
             setUploadEnd(false)
             try {
+                console.log('=== onFinish eval pickFile start')
                 eval('window.pickFile =' + code.trim())
                 //@ts-ignore
                 if (typeof window.pickFile !== 'function') {
                     throw new Error()
                 }
+                console.log('=== onFinish eval pickFile done')
                 //@ts-ignore
                 const pickFile: (arg: any) => File[] = window.pickFile
 
+                console.log('=== onFinish use current view records', { recordCount: records.length, viewId: currentSelection.viewId, tableId: currentSelection.tableId })
+                console.log('=== onFinish build compare fields start', { compareFieldCount: compares?.length || 0 })
                 const comparesFieldValueList: {
                     [fieldId: string]: {
                         [recordId: string]: IOpenCellValue
                     }
-                } = Object.fromEntries(await Promise.all(compares.map(async (fieldId: string) => {
-                    const field = await table.getFieldById(fieldId).catch((error) => {
-                        message.error('getFieldById error:' + '\n' + String(error));
-                        throw error;
-                    });
-                    const valueList = await (async (table: any) => {
-                        let recordIdData;
-                        let token = undefined as any;
-                        // setLoading(true);
-                        const recordIdList = []
-                        do {
-                            recordIdData = await table.getFieldValueListByPage(token ? { pageToken: token, pageSize: 200 } : { pageSize: 200 }).catch((error: any) => {
-                                message.error('getFieldValueListByPage error:' + '\n' + String(error));
-                                throw error;
-                            });
-                            token = recordIdData.pageToken;
-                            // setLoadingTip(`${((token > 200 ? (token - 200) : 0) / recordIdData.total * 100).toFixed(2)}%`)
-                            recordIdList.push(...recordIdData.fieldValues.map((v: any) => { v.record_id = v.recordId; return v }))
-
-                        } while (recordIdData.hasMore);
-                        // setLoading(false);
-                        return recordIdList
-                    })(field);
-                    const values = Object.fromEntries(valueList.map(({ record_id, value }) => [record_id, value]))
+                } = Object.fromEntries(compares.map((fieldId: string) => {
+                    console.log('=== onFinish build compare field', { fieldId })
+                    const values = Object.fromEntries(records.map(({ recordId, fields }) => [recordId, fields[fieldId]]))
                     return [fieldId, values]
-                })))
-                const fileField = await table.getFieldById(fileFieldId).catch((error: any) => {
-                    message.error('getFieldById error:' + '\n' + String(error));
-                    throw error;
-                });
-                const fileFieldValue = await (async (table: any) => {
-                    let recordIdData;
-                    let token = undefined as any;
-                    // setLoading(true);
-                    const recordIdList = []
-                    do {
-                        recordIdData = await table.getFieldValueListByPage(token ? { pageToken: token, pageSize: 200 } : { pageSize: 200 }).catch((error: any) => {
-                            message.error('getFieldValueListByPage error:' + '\n' + String(error));
-                            throw error;
-                        });
-                        token = recordIdData.pageToken;
-                        // setLoadingTip(`${((token > 200 ? (token - 200) : 0) / recordIdData.total * 100).toFixed(2)}%`)
-                        recordIdList.push(...recordIdData.fieldValues.map((v: any) => { v.record_id = v.recordId; return v }))
-
-                    } while (recordIdData.hasMore);
-                    // setLoading(false);
-                    return recordIdList
-                })(fileField);
-                tableInfo.current!.exitFileValueList = Object.fromEntries(fileFieldValue.map(({ value, record_id }) => {
-                    return [record_id, value]
                 }))
+                console.log('=== onFinish build compare fields done')
+                console.log('=== onFinish build file field values start', { fileFieldId })
+                tableInfo.current!.exitFileValueList = Object.fromEntries(records.map(({ recordId, fields }) => {
+                    return [recordId, fields[fileFieldId]]
+                }))
+                console.log('=== onFinish build file field values done', { valueCount: records.length })
 
                 tableInfo.current!.comparesFieldValueList = comparesFieldValueList
                 try {
+                    console.log('=== onFinish build preview start')
                     setLoadingContent(t('is.matching'))
                     setLoading(true)
 
                     setTimeout(() => {
-                        tableInfo.current?.viewRecordIdList.map((recordId) => {
-                            const currentFileFieldValue = tableInfo.current?.exitFileValueList[recordId]
-                            // 和所选一样的顺序
-                            const compareValues = compares.map((fieldId: string) => comparesFieldValueList[fieldId][recordId])
-                            const files = pickFile({ fileList, compareValues, currentValue: currentFileFieldValue }) || []
+                        try {
+                            console.log('=== onFinish matching records start', { recordCount: tableInfo.current?.viewRecordIdList?.length || 0 })
+                            tableInfo.current?.viewRecordIdList.map((recordId) => {
+                                const currentFileFieldValue = tableInfo.current?.exitFileValueList[recordId]
+                                // 和所选一样的顺序
+                                const compareValues = compares.map((fieldId: string) => comparesFieldValueList[fieldId][recordId])
+                                const files = pickFile({ fileList, compareValues, currentValue: currentFileFieldValue }) || []
 
-                            if (!overWriteFile) {
-                                if (currentFileFieldValue) {
-                                    recordFiles.set(recordId, undefined)
+                                if (!overWriteFile) {
+                                    if (currentFileFieldValue) {
+                                        recordFiles.set(recordId, undefined)
+                                    } else {
+                                        recordFiles.set(recordId, files?.length ? files : null)
+                                    }
                                 } else {
                                     recordFiles.set(recordId, files?.length ? files : null)
                                 }
-                            } else {
-                                recordFiles.set(recordId, files?.length ? files : null)
-                            }
-                        })
-                        setPreTable(
-                            getPreviewTable({
-                                fieldsMetaList: fieldMetaList!,
-                                fileFieldId,
-                                recordFiles,
-                                allRecordsIds: tableInfo.current?.viewRecordIdList!,
-                                compares,
-                                overWriteFile,
-                                exitFileValueList: tableInfo.current!.exitFileValueList,
-                                comparesFieldValueList
                             })
-                        )
+                            console.log('=== onFinish matching records done')
+                            console.log('=== onFinish build preview table start')
+                            setPreTable(
+                                getPreviewTable({
+                                    fieldsMetaList: fieldMetaList!,
+                                    fileFieldId,
+                                    recordFiles,
+                                    allRecordsIds: tableInfo.current?.viewRecordIdList!,
+                                    compares,
+                                    overWriteFile,
+                                    exitFileValueList: tableInfo.current!.exitFileValueList,
+                                    comparesFieldValueList
+                                })
+                            )
+                            console.log('=== onFinish build preview table done')
 
 
 
-                        setPreTableFitForm(true)
+                            setPreTableFitForm(true)
 
-                        setLoadingContent('')
-                        setTimeout(() => {
+                            setLoadingContent('')
+                            setTimeout(() => {
+                                console.log('=== onFinish loading end')
+                                setLoading(false);
+                            }, 1000);
+                        } catch (error) {
+                            console.log('=== onFinish build preview error', error)
+                            message.error(t('function.errot') + '\n' + String(error))
                             setLoading(false);
-                        }, 1000);
+                            setLoadingContent('')
+                        }
 
                     });
 
 
                 } catch (error) {
-                    message.error(t('function.error') + '\n' + String(error))
+                    console.log('=== onFinish build preview schedule error', error)
+                    message.error(t('function.errot') + '\n' + String(error))
                     setLoading(false);
                     setLoadingContent('')
 
@@ -746,6 +923,7 @@ function UploadFileToForm() {
 
                 // const 
             } catch (error) {
+                console.log('=== onFinish declare pickFile error', error)
                 message.error(t('function.dealare.error') + '\n' + String(error))
                 setLoadingContent('')
                 setLoading(false)
@@ -767,144 +945,127 @@ function UploadFileToForm() {
             >
 
                 <div id='container' className='container'>
+                    <div style={{ marginBottom: 12, border: '1px solid #f0f0f0', padding: 12, borderRadius: 4, background: '#fafafa' }}>
+                        {t('current.processing', {
+                            tableName: currentLocation.tableName || currentLocation.tableId,
+                            viewName: currentLocation.viewName || currentLocation.viewId,
+                        })}
+                    </div>
+                    {loading && uploadProgress && uploadProgress.total > 0 && (
+                        <div style={{ marginBottom: 12 }}>
+                            <Progress percent={uploadProgress.percent} size="small" />
+                        </div>
+                    )}
                     <Form
                         onFinish={onFinish}
                         form={form}>
-                        {/* 选择表格 */}
-                        <Form.Item
-                            hidden
-                            rules={[{ required: true }]}
-                            name='tableId'
-                            initialValue={tableInfo.current.tableId} label={t('select.table')}>
-                            <Select
-                                onChange={(tableId) => {
-                                    onSelectTable(tableId);
-                                    setPreTableFitForm(false)
-                                }}
-                                options={tableInfo.current.tableMetaList.map(({ id, name }) => ({ label: name, value: id }))}
-                            >
-                            </Select>
-                        </Form.Item>
-
-                        {/* 选择视图 */}
-                        <Form.Item
-                            rules={[{ required: true }]}
-                            hidden
-                            name='viewId'
-                            initialValue={tableInfo.current.view?.id} label={t('select.view')}>
-                            <Select
-                                onChange={onSelectView}
-                                options={tableInfo.current.viewMetaList?.map(({ id, name, type }) => ({ label: name, value: id }))}
-                            >
-                            </Select>
-                        </Form.Item>
-
-
                         <Form.Item style={{ marginBottom: '0' }} label={t('choose.mode')}>
                             <ChooseTemp onChange={(v) => setUploadActionType(v)} />
                         </Form.Item>
 
                         <div key={uploadActionType}>
-                            {uploadActionType === UploadFileActionType.GetFileByName && [<Form.Item
-                                name='compares'
-
-                                tooltip={t('compares.tooltip')}
-                                initialValue={[fieldMetaList?.[0]?.id]}
-                                label={t('select.pickField')}>
-                                <Select
-                                    mode='multiple'
-                                    options={fieldMetaList?.map(({ id, name, type }) => ({
-                                        label:
-                                            // @ts-ignore
-                                            <div className='filedIconContainer'>{fieldIcons[type]} {name}</div>,
-                                        value: id
-                                    }))}
-                                >
-                                </Select>
-                            </Form.Item>,
-                            <div style={{ marginBottom: 12, border: '1px solid #f0f0f0', padding: 12, borderRadius: 4, background: '#fafafa' }}>
-                                <Form.Item label={t('rule.select')} style={{ marginBottom: 12 }}>
-                                    <Select
-                                        style={{ width: '100%' }}
-                                        value={currentRuleId}
-                                        onChange={handleRuleChange}
-                                        options={[
-                                            { label: t('rule.default'), value: 'default' },
-                                            ...savedRules.map(r => ({ label: r.name, value: r.id }))
-                                        ]}
-                                    />
-                                </Form.Item>
-                                <Form.Item label={t('rule.name')} style={{ marginBottom: 12 }} required={currentRuleId === 'default'}>
-                                    <Input
-                                        placeholder={currentRuleId === 'default' ? t('rule.name.placeholder.new') : t('rule.name.placeholder.edit')}
-                                        value={ruleName}
-                                        onChange={e => setRuleName(e.target.value)}
-                                    />
-                                </Form.Item>
-                                <Space>
-                                    <Button type='primary' icon={
-                                        // @ts-ignore
-                                        <SaveOutlined />
-                                    } onClick={handleSaveRule}>
-                                        {currentRuleId === 'default' ? t('rule.create') : t('rule.update')}
-                                    </Button>
-                                    <Button icon={
-                                        // @ts-ignore
-                                        <CopyOutlined />
-                                    } onClick={handleSaveAsRule}>
-                                        {t('rule.save.as')}
-                                    </Button>
-                                    {currentRuleId !== 'default' && (
-                                        <Popconfirm title={t('rule.delete')} onConfirm={handleDeleteRule}>
+                            {uploadActionType === UploadFileActionType.GetFileByName && (
+                                <>
+                                    <Form.Item
+                                        name='compares'
+                                        tooltip={t('compares.tooltip')}
+                                        initialValue={[fieldMetaList?.[0]?.id]}
+                                        label={t('select.pickField')}>
+                                        <Select
+                                            mode='multiple'
+                                            options={fieldMetaList?.map(({ id, name, type }) => ({
+                                                label:
+                                                    // @ts-ignore
+                                                    <div className='filedIconContainer'>{fieldIcons[type]} {name}</div>,
+                                                value: id
+                                            }))}
+                                        >
+                                        </Select>
+                                    </Form.Item>
+                                    <div style={{ marginBottom: 12, border: '1px solid #f0f0f0', padding: 12, borderRadius: 4, background: '#fafafa' }}>
+                                        <Form.Item label={t('rule.select')} style={{ marginBottom: 12 }}>
+                                            <Select
+                                                style={{ width: '100%' }}
+                                                value={currentRuleId}
+                                                onChange={handleRuleChange}
+                                                options={[
+                                                    { label: t('rule.default'), value: 'default' },
+                                                    ...savedRules.map(r => ({ label: r.name, value: r.id }))
+                                                ]}
+                                            />
+                                        </Form.Item>
+                                        <Form.Item label={t('rule.name')} style={{ marginBottom: 12 }} required={currentRuleId === 'default'}>
+                                            <Input
+                                                placeholder={currentRuleId === 'default' ? t('rule.name.placeholder.new') : t('rule.name.placeholder.edit')}
+                                                value={ruleName}
+                                                onChange={e => setRuleName(e.target.value)}
+                                            />
+                                        </Form.Item>
+                                        <Space>
+                                            <Button type='primary' icon={
+                                                // @ts-ignore
+                                                <SaveOutlined />
+                                            } onClick={handleSaveRule}>
+                                                {currentRuleId === 'default' ? t('rule.create') : t('rule.update')}
+                                            </Button>
                                             <Button icon={
                                                 // @ts-ignore
-                                                <DeleteOutlined />
-                                            } danger>
-                                                {t('rule.delete')}
+                                                <CopyOutlined />
+                                            } onClick={handleSaveAsRule}>
+                                                {t('rule.save.as')}
                                             </Button>
-                                        </Popconfirm>
-                                    )}
-                                </Space>
-                            </div>,
-                            <Collapse size='small' items={[{
-                                key: '1', label: t('pickFile.label'),
-                                children: <Editor
-                                    key={currentRuleId}
-                                    defaultValue={codeEditorValue.current}
-                                    onChange={(v) => { codeEditorValue.current = v }} />
-                            }]} defaultActiveKey={['-1']} />,
-                            <br />,
-                            <Form.Item initialValue={['\n']} rules={[{ required: true }]}
-                                tooltip={t('self.reg.tooltip')} label={t('self.reg')}>
+                                            {currentRuleId !== 'default' && (
+                                                <Popconfirm title={t('rule.delete')} onConfirm={handleDeleteRule}>
+                                                    <Button icon={
+                                                        // @ts-ignore
+                                                        <DeleteOutlined />
+                                                    } danger>
+                                                        {t('rule.delete')}
+                                                    </Button>
+                                                </Popconfirm>
+                                            )}
+                                        </Space>
+                                    </div>
+                                    <Collapse size='small' items={[{
+                                        key: '1', label: t('pickFile.label'),
+                                        children: <Editor
+                                            key={currentRuleId}
+                                            defaultValue={codeEditorValue.current}
+                                            onChange={(v) => { codeEditorValue.current = v }} />
+                                    }]} defaultActiveKey={['-1']} />
+                                    <br />
+                                    <Form.Item initialValue={['\n']} rules={[{ required: true }]}
+                                        tooltip={t('self.reg.tooltip')} label={t('self.reg')}>
 
-                                <Checkbox.Group
-                                    onChange={(v) => {
-                                        if (!v || !v?.length) {
-                                            // @ts-ignore
-                                            window._reg = /[]+/g
-                                            return;
-                                        }
-                                        // @ts-ignore
-                                        window['_reg'] = new RegExp(`[${v.join('')}]+`, 'g')
-                                    }}
-                                    defaultValue={['\n']}
-                                    options={[
-                                        { label: t('space'), value: ' ' },
-                                        { label: t('e'), value: '\n' },
-                                        { label: '#', value: '#' },
-                                        { label: '\\', value: '\\\\' },
-                                        { label: '/', value: '/' },
-                                        { label: '|', value: '|' },
-                                        { label: '，', value: '，' },
-                                        { label: '；', value: '；' },
-                                        { label: ';', value: ';' },
-                                        { label: ',', value: ',' },
+                                        <Checkbox.Group
+                                            onChange={(v) => {
+                                                if (!v || !v?.length) {
+                                                    // @ts-ignore
+                                                    window._reg = /[]+/g
+                                                    return;
+                                                }
+                                                // @ts-ignore
+                                                window['_reg'] = new RegExp(`[${v.join('')}]+`, 'g')
+                                            }}
+                                            defaultValue={['\n']}
+                                            options={[
+                                                { label: t('space'), value: ' ' },
+                                                { label: t('e'), value: '\n' },
+                                                { label: '#', value: '#' },
+                                                { label: '\\', value: '\\\\' },
+                                                { label: '/', value: '/' },
+                                                { label: '|', value: '|' },
+                                                { label: '，', value: '，' },
+                                                { label: '；', value: '；' },
+                                                { label: ';', value: ';' },
+                                                { label: ',', value: ',' },
 
-                                    ]}>
+                                            ]}>
 
-                                </Checkbox.Group>
-                            </Form.Item>
-                            ]}
+                                        </Checkbox.Group>
+                                    </Form.Item>
+                                </>
+                            )}
                         </div>
 
 
@@ -1037,7 +1198,7 @@ function getPreviewTable({ fieldsMetaList, fileFieldId, allRecordsIds, compares,
         },
         overWriteFile: boolean,
         exitFileValueList: {
-            [recordId: string]: any[]
+            [recordId: string]: IOpenCellValue
         },
     }) {
 
@@ -1056,14 +1217,22 @@ function getPreviewTable({ fieldsMetaList, fileFieldId, allRecordsIds, compares,
         key: fileFieldId,
         fixed: 'right',
         width: 250,
-        render: (cell: File[]) => {
-            return <div className='tableCell'>{cell?.map?.((file: File) => file.name).join('\n')}</div>
+        render: (cell: any) => {
+            // When getRecordsByPage({ stringValue: true }) is used, some fields may become strings.
+            if (Array.isArray(cell)) {
+                const names = cell
+                    .map((file: any) => file?.name ?? file?.text ?? file?.fullAddress ?? file?.url ?? file?.email ?? '')
+                    .filter(Boolean)
+                    .join('\n')
+                return <div className='tableCell'>{names}</div>
+            }
+            return <div className='tableCell'>{getTalbeCellString(cell)}</div>
         }
     })
 
     const dataSource = allRecordsIds.map((recordId: string) => {
         const comparesFields = compares.map((fieldId) => [fieldId, comparesFieldValueList[fieldId][recordId]])
-        let fileFields = [fileFieldId, recordFiles.get(recordId)]
+        let fileFields: [string, any] = [fileFieldId, recordFiles.get(recordId)]
         if (!overWriteFile && exitFileValueList[recordId]) {
             fileFields = [fileFieldId, exitFileValueList[recordId]]
         }

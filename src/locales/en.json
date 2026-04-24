@@ -69,5 +69,9 @@
   "rule.create": "Save as New Rule",
   "rule.name.placeholder.new": "Enter new rule name",
   "rule.name.placeholder.edit": "Current rule name",
-  "rule.name.duplicate": "Rule name already exists, please choose another one"
+  "rule.name.duplicate": "Rule name already exists, please choose another one",
+  "current.processing": "Current: {{tableName}} > {{viewName}}",
+  "selection.missing": "Please select a table and view first",
+  "loading.records.progress": "Loading records: {{loaded}}/{{total}} ({{percent}}%)",
+  "upload.progress": "Upload progress: {{done}}/{{total}} ({{percent}}%)"
 }

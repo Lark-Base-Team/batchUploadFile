@@ -15,8 +15,8 @@ importers:
         specifier: 6.2.1
         version: 6.2.1
       '@lark-base-open/js-sdk':
-        specifier: https://lf3-static.bytednsdoc.com/obj/eden-cn/jjjpceh7nulojvhj/@lark-base-open-js-sdk-0.4.1-rc.7.tgz
-        version: https://lf3-static.bytednsdoc.com/obj/eden-cn/jjjpceh7nulojvhj/@lark-base-open-js-sdk-0.4.1-rc.7.tgz
+        specifier: ^1.0.2
+        version: 1.0.2
       '@lezer/highlight':
         specifier: 1.1.6
         version: 1.1.6
@@ -286,9 +286,8 @@ packages:
   '@jridgewell/trace-mapping@0.3.31':
     resolution: {integrity: sha512-zzNR+SdQSDJzc8joaeP8QQoCQr8NuYx2dIIytl1QeBEZHJ9uW6hebsrYgbz8hJwUQao3TWCMtmfV8Nu1twOLAw==}
 
-  '@lark-base-open/js-sdk@https://lf3-static.bytednsdoc.com/obj/eden-cn/jjjpceh7nulojvhj/@lark-base-open-js-sdk-0.4.1-rc.7.tgz':
-    resolution: {integrity: sha512-ADp4IYUfy/z9mh/kIPvIKLWRmMVT1IQbYgZamEzDO6rw1Cigj8Xxo8W9/mWZwvzVCEGenR7316aUXrtqT+VzkA==, tarball: https://lf3-static.bytednsdoc.com/obj/eden-cn/jjjpceh7nulojvhj/@lark-base-open-js-sdk-0.4.1-rc.7.tgz}
-    version: 0.4.1-rc.7
+  '@lark-base-open/js-sdk@1.0.2':
+    resolution: {integrity: sha512-z2v+xeURfk3MDobgN66C4YYwp0sCoqreN5LDfJQBSXXLrzynyDewi7kWxpoFaggsryPfZOmPimpvGp+UZH6SHg==}
 
   '@lezer/common@1.5.1':
     resolution: {integrity: sha512-6YRVG9vBkaY7p1IVxL4s44n5nUnaNnGM2/AckNgYOnxTG2kWh1vR8BMxPseWPjRNpb5VtXnMpeYAEAADoRV1Iw==}
@@ -1374,7 +1373,7 @@ snapshots:
       '@jridgewell/resolve-uri': 3.1.2
       '@jridgewell/sourcemap-codec': 1.5.5
 
-  '@lark-base-open/js-sdk@https://lf3-static.bytednsdoc.com/obj/eden-cn/jjjpceh7nulojvhj/@lark-base-open-js-sdk-0.4.1-rc.7.tgz': {}
+  '@lark-base-open/js-sdk@1.0.2': {}
 
   '@lezer/common@1.5.1': {}
 

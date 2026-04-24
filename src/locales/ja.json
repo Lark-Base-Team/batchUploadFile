@@ -54,5 +54,9 @@
   "space": "スペース",
   "e": "改行",
   "upload.error.files": "以下のファイルのアップロード中にエラーが発生しました:",
-  "btn.preview": "ファイルアップロードプレビュー"
+  "btn.preview": "ファイルアップロードプレビュー",
+  "current.processing": "現在の対象: {{tableName}} > {{viewName}}",
+  "selection.missing": "まずデータテーブルとビューを選択してください",
+  "loading.records.progress": "レコード読み込み: {{loaded}}/{{total}} ({{percent}}%)",
+  "upload.progress": "アップロード進捗: {{done}}/{{total}} ({{percent}}%)"
 }

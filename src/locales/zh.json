@@ -69,5 +69,9 @@
   "rule.create": "保存为新规则",
   "rule.name.placeholder.new": "输入新规则名称",
   "rule.name.placeholder.edit": "当前规则名称",
-  "rule.name.duplicate": "规则名称已存在，请更换名称"
+  "rule.name.duplicate": "规则名称已存在，请更换名称",
+  "current.processing": "当前处理：{{tableName}} > {{viewName}}",
+  "selection.missing": "请先选择一个数据表和视图",
+  "loading.records.progress": "加载记录：{{loaded}}/{{total}} ({{percent}}%)",
+  "upload.progress": "上传进度：{{done}}/{{total}} ({{percent}}%)"
 }
