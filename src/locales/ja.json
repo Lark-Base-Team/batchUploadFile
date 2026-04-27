@@ -60,6 +60,8 @@
   "selection.context.error": "現在のビューコンテキストの読み込みに失敗しました。再試行してください。",
   "action.retry": "再試行",
   "action.refresh": "更新",
+  "action.feedback": "バグ報告/要望",
+  "action.legacy": "旧版に戻る",
   "compares.required": "少なくとも1つのマッチングフィールドを選択してください",
   "loading.records.progress": "レコード読み込み: {{loaded}}/{{total}} ({{percent}}%)",
   "upload.progress": "アップロード進捗: {{done}}/{{total}} ({{percent}}%)"

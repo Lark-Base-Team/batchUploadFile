@@ -75,6 +75,8 @@
   "selection.context.error": "Failed to load the current view context. Please try again.",
   "action.retry": "Retry",
   "action.refresh": "Refresh",
+  "action.feedback": "Bug Feedback / Request",
+  "action.legacy": "Back to Legacy",
   "compares.required": "Please select at least one matching field",
   "loading.records.progress": "Loading records: {{loaded}}/{{total}} ({{percent}}%)",
   "upload.progress": "Upload progress: {{done}}/{{total}} ({{percent}}%)"

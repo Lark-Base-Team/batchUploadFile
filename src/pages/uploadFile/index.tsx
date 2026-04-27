@@ -1,12 +1,13 @@
 // @ts-ignore
 import React, { useState, useRef, useEffect, useMemo } from 'react'
-import { Button, Upload, UploadFile, UploadProps, Table, Form, Select, FormInstance, Switch, notification, Spin, Collapse, message, Checkbox, Input, Space, Popconfirm, Progress } from 'antd'
-import { UploadOutlined, FileAddOutlined, CloudUploadOutlined, DeleteOutlined, SaveOutlined, CopyOutlined, ReloadOutlined } from '@ant-design/icons';
+import { Button, Upload, UploadFile, UploadProps, Table, Form, Select, FormInstance, Switch, notification, Spin, Collapse, message, Checkbox, Input, Space, Popconfirm, Progress, FloatButton } from 'antd'
+import { UploadOutlined, FileAddOutlined, CloudUploadOutlined, DeleteOutlined, SaveOutlined, CopyOutlined, ReloadOutlined, MessageOutlined, RollbackOutlined } from '@ant-design/icons';
 import Editor from './codeEditor';
 import './style.css'
 import { FieldType, IBaseViewMeta, IFieldMeta, IOpenAttachment, IOpenCellValue, IField, ITable, IView, ITableMeta, ViewType, bitable, IRecord } from '@lark-base-open/js-sdk';
 import { fieldIcons } from './icons'
 import TextArea from 'antd/es/input/TextArea';
+import { getCurrentVersion } from './version'
 //@ts-ignore
 window.bitable = bitable
 //@ts-ignore
@@ -243,74 +244,91 @@ export default function RefreshCom() {
     const [selectionContextError, setSelectionContextError] = useState<string>()
     useEffect(() => {
         let cancelled = false
-        ; (async () => {
-            const { tableId, viewId } = await bitable.base.getSelection()
-            if (cancelled) return
-            const nextSelection = { tableId: tableId || undefined, viewId: viewId || undefined }
-            setSelection(nextSelection)
-            if (!nextSelection.tableId || !nextSelection.viewId) {
-                setSelectionContext(undefined)
+            ; (async () => {
+                const { tableId, viewId } = await bitable.base.getSelection()
+                if (cancelled) return
+                const nextSelection = { tableId: tableId || undefined, viewId: viewId || undefined }
+                setSelection(nextSelection)
+                if (!nextSelection.tableId || !nextSelection.viewId) {
+                    setSelectionContext(undefined)
+                    setSelectionContextError(undefined)
+                    return
+                }
                 setSelectionContextError(undefined)
-                return
-            }
-            setSelectionContextError(undefined)
-            setSelectionContext(undefined)
-            console.log('=== RefreshCom load selection context start', { tableId, viewId })
-            const [table, tableMetaList] = await Promise.all([
-                bitable.base.getTableById(nextSelection.tableId),
-                bitable.base.getTableMetaList()
-            ])
-            const [view, viewMetaList] = await Promise.all([
-                table.getViewById(nextSelection.viewId),
-                table.getViewMetaList()
-            ])
-            const fieldMetaList = await view.getFieldMetaList()
-            const tableName = tableMetaList.find(({ id }) => id === nextSelection.tableId)?.name || nextSelection.tableId
-            const viewName = viewMetaList.find(({ id }) => id === nextSelection.viewId)?.name || nextSelection.viewId
-            const ctx: SelectionContext = {
-                tableId: nextSelection.tableId,
-                viewId: nextSelection.viewId,
-                tableName,
-                viewName,
-                table,
-                view,
-                tableMetaList,
-                viewMetaList: viewMetaList.filter(({ type }) => type === ViewType.Grid),
-                fieldMetaList,
-            }
-            if (cancelled) return
-            setSelectionContext(ctx)
-            console.log('=== RefreshCom load selection context done', { tableId: nextSelection.tableId, viewId: nextSelection.viewId })
-        })().catch((error: any) => {
-            console.log('=== RefreshCom load selection context error', error)
-            if (cancelled) return
-            setSelection(undefined)
-            setSelectionContext(undefined)
-            setSelectionContextError(String(error))
-        });
+                setSelectionContext(undefined)
+                console.log('=== RefreshCom load selection context start', { tableId, viewId })
+                const [table, tableMetaList] = await Promise.all([
+                    bitable.base.getTableById(nextSelection.tableId),
+                    bitable.base.getTableMetaList()
+                ])
+                const [view, viewMetaList] = await Promise.all([
+                    table.getViewById(nextSelection.viewId),
+                    table.getViewMetaList()
+                ])
+                const fieldMetaList = await view.getFieldMetaList()
+                const tableName = tableMetaList.find(({ id }) => id === nextSelection.tableId)?.name || nextSelection.tableId
+                const viewName = viewMetaList.find(({ id }) => id === nextSelection.viewId)?.name || nextSelection.viewId
+                const ctx: SelectionContext = {
+                    tableId: nextSelection.tableId,
+                    viewId: nextSelection.viewId,
+                    tableName,
+                    viewName,
+                    table,
+                    view,
+                    tableMetaList,
+                    viewMetaList: viewMetaList.filter(({ type }) => type === ViewType.Grid),
+                    fieldMetaList,
+                }
+                if (cancelled) return
+                setSelectionContext(ctx)
+                console.log('=== RefreshCom load selection context done', { tableId: nextSelection.tableId, viewId: nextSelection.viewId })
+            })().catch((error: any) => {
+                console.log('=== RefreshCom load selection context error', error)
+                if (cancelled) return
+                setSelection(undefined)
+                setSelectionContext(undefined)
+                setSelectionContextError(String(error))
+            });
         return () => {
             cancelled = true
         }
     }, [])
 
-    const reloadButton = <Button
-        type='primary'
-        icon={<ReloadOutlined onPointerEnterCapture={undefined} onPointerLeaveCapture={undefined} />}
-        style={{ position: 'fixed', top: 16, right: 16, zIndex: 1000 }}
-        onClick={() => window.location.reload()}>
-        {t('action.refresh')}
-    </Button>
+    const floatingActions = <FloatButton.Group
+        trigger="hover"
+        type="primary"
+        placement="bottom"
+        style={{ right: 24, top: 12, bottom: 'unset' }}
+        icon={<ReloadOutlined onPointerEnterCapture={undefined} onPointerLeaveCapture={undefined} />}>
+        <FloatButton
+            tooltip={t('action.refresh')}
+            icon={<ReloadOutlined onPointerEnterCapture={undefined} onPointerLeaveCapture={undefined} />}
+            onClick={() => window.location.reload()}
+        />
+        <FloatButton
+            tooltip={t('action.feedback')}
+            icon={<MessageOutlined onPointerEnterCapture={undefined} onPointerLeaveCapture={undefined} />}
+            onClick={() => window.open('https://bytedance.larkoffice.com/share/base/form/shrcnZftkhHVnOCQBORpyqbmsLe', '_blank', 'noopener,noreferrer')}
+        />
+        <FloatButton
+            tooltip={t('action.legacy')}
+            icon={<RollbackOutlined onPointerEnterCapture={undefined} onPointerLeaveCapture={undefined} />}
+            onClick={() => {
+                window.location.href = getCurrentVersion()
+            }}
+        />
+    </FloatButton.Group>
 
     if (!selection?.tableId || !selection?.viewId) {
         return <div>
-            {reloadButton}
+            {floatingActions}
             <h1>{t('selection.missing')}</h1>
         </div>
     }
 
     if (selectionContextError) {
         return <div style={{ padding: 16 }}>
-            {reloadButton}
+            {floatingActions}
             <div style={{ marginBottom: 12 }}>{t('selection.context.error')}</div>
             <Button onClick={() => window.location.reload()}>{t('action.retry')}</Button>
         </div>
@@ -318,13 +336,13 @@ export default function RefreshCom() {
 
     if (!selectionContext || selectionContext.tableId !== selection.tableId || selectionContext.viewId !== selection.viewId) {
         return <div>
-            {reloadButton}
+            {floatingActions}
             <Spin spinning={true}></Spin>
         </div>
     }
 
     return <div>
-        {reloadButton}
+        {floatingActions}
         <UploadFileToForm currentSelection={selection} selectionContext={selectionContext} />
     </div>
 }

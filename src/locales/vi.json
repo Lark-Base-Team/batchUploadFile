@@ -60,6 +60,8 @@
     "selection.context.error": "Không thể tải ngữ cảnh của chế độ xem hiện tại. Vui lòng thử lại.",
     "action.retry": "Thử lại",
     "action.refresh": "Làm mới",
+    "action.feedback": "Phản hồi lỗi/Yêu cầu",
+    "action.legacy": "Quay về bản cũ",
     "compares.required": "Vui lòng chọn ít nhất một trường khớp",
     "loading.records.progress": "Đang tải bản ghi: {{loaded}}/{{total}} ({{percent}}%)",
     "upload.progress": "Tiến độ tải lên: {{done}}/{{total}} ({{percent}}%)"
