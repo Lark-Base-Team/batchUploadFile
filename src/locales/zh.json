@@ -72,6 +72,10 @@
   "rule.name.duplicate": "规则名称已存在，请更换名称",
   "current.processing": "当前处理：{{tableName}} > {{viewName}}",
   "selection.missing": "请先选择一个数据表和视图",
+  "selection.context.error": "当前视图上下文加载失败，请重试",
+  "action.retry": "重试",
+  "action.refresh": "刷新",
+  "compares.required": "请至少选择一个匹配字段",
   "loading.records.progress": "加载记录：{{loaded}}/{{total}} ({{percent}}%)",
   "upload.progress": "上传进度：{{done}}/{{total}} ({{percent}}%)"
 }

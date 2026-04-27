@@ -1,7 +1,7 @@
 // @ts-ignore
 import React, { useState, useRef, useEffect, useMemo } from 'react'
 import { Button, Upload, UploadFile, UploadProps, Table, Form, Select, FormInstance, Switch, notification, Spin, Collapse, message, Checkbox, Input, Space, Popconfirm, Progress } from 'antd'
-import { UploadOutlined, FileAddOutlined, CloudUploadOutlined, DeleteOutlined, SaveOutlined, CopyOutlined } from '@ant-design/icons';
+import { UploadOutlined, FileAddOutlined, CloudUploadOutlined, DeleteOutlined, SaveOutlined, CopyOutlined, ReloadOutlined } from '@ant-design/icons';
 import Editor from './codeEditor';
 import './style.css'
 import { FieldType, IBaseViewMeta, IFieldMeta, IOpenAttachment, IOpenCellValue, IField, ITable, IView, ITableMeta, ViewType, bitable, IRecord } from '@lark-base-open/js-sdk';
@@ -235,53 +235,41 @@ type SelectionContext = {
     tableMetaList: ITableMeta[],
     viewMetaList: IBaseViewMeta[],
     fieldMetaList: IFieldMeta[],
-    defaultFileFieldId?: string,
-    defaultCompareIds: string[],
 }
 
 export default function RefreshCom() {
     const [selection, setSelection] = useState<CurrentSelection>();
     const [selectionContext, setSelectionContext] = useState<SelectionContext>();
-    useEffect(() => {
-        let dispose: undefined | (() => void)
-        bitable.base.getSelection().then(({ tableId, viewId }) => {
-            setSelection({ tableId: tableId || undefined, viewId: viewId || undefined })
-        })
-        dispose = bitable.base.onSelectionChange((selection) => {
-            setSelection({
-                tableId: selection.data.tableId || undefined,
-                viewId: selection.data.viewId || undefined,
-            });
-        })
-        return () => {
-            dispose?.()
-        }
-    }, [])
-
+    const [selectionContextError, setSelectionContextError] = useState<string>()
     useEffect(() => {
         let cancelled = false
-        const { tableId, viewId } = selection || {}
-        if (!tableId || !viewId) {
+        ; (async () => {
+            const { tableId, viewId } = await bitable.base.getSelection()
+            if (cancelled) return
+            const nextSelection = { tableId: tableId || undefined, viewId: viewId || undefined }
+            setSelection(nextSelection)
+            if (!nextSelection.tableId || !nextSelection.viewId) {
+                setSelectionContext(undefined)
+                setSelectionContextError(undefined)
+                return
+            }
+            setSelectionContextError(undefined)
             setSelectionContext(undefined)
-            return
-        }
-        (async () => {
             console.log('=== RefreshCom load selection context start', { tableId, viewId })
             const [table, tableMetaList] = await Promise.all([
-                bitable.base.getTableById(tableId),
+                bitable.base.getTableById(nextSelection.tableId),
                 bitable.base.getTableMetaList()
             ])
             const [view, viewMetaList] = await Promise.all([
-                table.getViewById(viewId),
+                table.getViewById(nextSelection.viewId),
                 table.getViewMetaList()
             ])
             const fieldMetaList = await view.getFieldMetaList()
-            const attachmentFields = fieldMetaList.filter(({ type }) => type === FieldType.Attachment)
-            const tableName = tableMetaList.find(({ id }) => id === tableId)?.name || tableId
-            const viewName = viewMetaList.find(({ id }) => id === viewId)?.name || viewId
+            const tableName = tableMetaList.find(({ id }) => id === nextSelection.tableId)?.name || nextSelection.tableId
+            const viewName = viewMetaList.find(({ id }) => id === nextSelection.viewId)?.name || nextSelection.viewId
             const ctx: SelectionContext = {
-                tableId,
-                viewId,
+                tableId: nextSelection.tableId,
+                viewId: nextSelection.viewId,
                 tableName,
                 viewName,
                 table,
@@ -289,29 +277,54 @@ export default function RefreshCom() {
                 tableMetaList,
                 viewMetaList: viewMetaList.filter(({ type }) => type === ViewType.Grid),
                 fieldMetaList,
-                defaultFileFieldId: attachmentFields[0]?.id,
-                defaultCompareIds: fieldMetaList[0]?.id ? [fieldMetaList[0].id] : [],
             }
             if (cancelled) return
             setSelectionContext(ctx)
-            console.log('=== RefreshCom load selection context done', { tableId, viewId })
-        })().catch((error) => {
+            console.log('=== RefreshCom load selection context done', { tableId: nextSelection.tableId, viewId: nextSelection.viewId })
+        })().catch((error: any) => {
             console.log('=== RefreshCom load selection context error', error)
+            if (cancelled) return
+            setSelection(undefined)
+            setSelectionContext(undefined)
+            setSelectionContextError(String(error))
         });
         return () => {
             cancelled = true
         }
-    }, [selection?.tableId, selection?.viewId])
+    }, [])
+
+    const reloadButton = <Button
+        type='primary'
+        icon={<ReloadOutlined onPointerEnterCapture={undefined} onPointerLeaveCapture={undefined} />}
+        style={{ position: 'fixed', top: 16, right: 16, zIndex: 1000 }}
+        onClick={() => window.location.reload()}>
+        {t('action.refresh')}
+    </Button>
 
     if (!selection?.tableId || !selection?.viewId) {
-        return <h1>{t('selection.missing')}</h1>
+        return <div>
+            {reloadButton}
+            <h1>{t('selection.missing')}</h1>
+        </div>
+    }
+
+    if (selectionContextError) {
+        return <div style={{ padding: 16 }}>
+            {reloadButton}
+            <div style={{ marginBottom: 12 }}>{t('selection.context.error')}</div>
+            <Button onClick={() => window.location.reload()}>{t('action.retry')}</Button>
+        </div>
     }
 
     if (!selectionContext || selectionContext.tableId !== selection.tableId || selectionContext.viewId !== selection.viewId) {
-        return <Spin spinning={true}>1</Spin>
+        return <div>
+            {reloadButton}
+            <Spin spinning={true}></Spin>
+        </div>
     }
 
     return <div>
+        {reloadButton}
         <UploadFileToForm currentSelection={selection} selectionContext={selectionContext} />
     </div>
 }
@@ -516,11 +529,17 @@ function UploadFileToForm({ currentSelection, selectionContext }: { currentSelec
             viewMetaList,
         } as any;
 
+        const currentFormValues = form.getFieldsValue(['fileFieldId', 'compares'])
+        const validFieldIdSet = new Set(fieldMetaList.map(({ id }) => id))
+        const validAttachmentFieldIdSet = new Set(attachmentFields.map(({ id }) => id))
+        const nextCompares = (Array.isArray(currentFormValues.compares) ? currentFormValues.compares : []).filter((fieldId: string) => validFieldIdSet.has(fieldId))
+        const nextFileFieldId = validAttachmentFieldIdSet.has(currentFormValues.fileFieldId) ? currentFormValues.fileFieldId : undefined
+
         form.setFieldsValue({
             tableId,
             viewId,
-            fileFieldId: selectionContext.defaultFileFieldId,
-            compares: selectionContext.defaultCompareIds.length ? selectionContext.defaultCompareIds : undefined,
+            compares: nextCompares,
+            fileFieldId: nextFileFieldId,
         })
         return { table, view, fieldMetaList }
     }
@@ -820,6 +839,10 @@ function UploadFileToForm({ currentSelection, selectionContext }: { currentSelec
         }
 
         if (uploadActionType === UploadFileActionType.GetFileByName) {
+            if (!Array.isArray(compares) || !compares.length) {
+                message.error(t('compares.required'))
+                return;
+            }
             console.log('=== onFinish updateTableInfo start')
             const tableResult = await updateTableInfo(currentSelection, { loadRecords: true, forceReload: true }).catch((error) => {
                 console.log('=== onFinish updateTableInfo error', error)
@@ -982,7 +1005,6 @@ function UploadFileToForm({ currentSelection, selectionContext }: { currentSelec
                                     <Form.Item
                                         name='compares'
                                         tooltip={t('compares.tooltip')}
-                                        initialValue={[fieldMetaList?.[0]?.id]}
                                         label={t('select.pickField')}>
                                         <Select
                                             mode='multiple'
@@ -1090,7 +1112,7 @@ function UploadFileToForm({ currentSelection, selectionContext }: { currentSelec
                         <Form.Item
                             rules={[{ required: true }]}
                             name='fileFieldId'
-                            initialValue={fieldMetaList?.find(({ type }) => type === FieldType.Attachment)?.id} label={t('select.fileFieldId')}>
+                            label={t('select.fileFieldId')}>
                             <Select
                                 onChange={() => setPreTableFitForm(false)}
                                 options={fieldMetaList?.filter(({ type }) => type === FieldType.Attachment).map(({ id, name }) => ({ label: name, value: id }))}

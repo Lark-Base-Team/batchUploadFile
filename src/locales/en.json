@@ -72,6 +72,10 @@
   "rule.name.duplicate": "Rule name already exists, please choose another one",
   "current.processing": "Current: {{tableName}} > {{viewName}}",
   "selection.missing": "Please select a table and view first",
+  "selection.context.error": "Failed to load the current view context. Please try again.",
+  "action.retry": "Retry",
+  "action.refresh": "Refresh",
+  "compares.required": "Please select at least one matching field",
   "loading.records.progress": "Loading records: {{loaded}}/{{total}} ({{percent}}%)",
   "upload.progress": "Upload progress: {{done}}/{{total}} ({{percent}}%)"
 }

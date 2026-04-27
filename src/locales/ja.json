@@ -57,6 +57,10 @@
   "btn.preview": "ファイルアップロードプレビュー",
   "current.processing": "現在の対象: {{tableName}} > {{viewName}}",
   "selection.missing": "まずデータテーブルとビューを選択してください",
+  "selection.context.error": "現在のビューコンテキストの読み込みに失敗しました。再試行してください。",
+  "action.retry": "再試行",
+  "action.refresh": "更新",
+  "compares.required": "少なくとも1つのマッチングフィールドを選択してください",
   "loading.records.progress": "レコード読み込み: {{loaded}}/{{total}} ({{percent}}%)",
   "upload.progress": "アップロード進捗: {{done}}/{{total}} ({{percent}}%)"
 }
